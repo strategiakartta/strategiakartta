@@ -1,0 +1,340 @@
+/*******************************************************************************
+ * Copyright (c) 2014 Ministry of Transport and Communications (Finland).
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * which accompanies this distribution, and is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ *
+ * Contributors:
+ *     Semantum Oy - initial API and implementation
+ *******************************************************************************/
+
+@import "addons.scss";
+@import "fi_semantum_strategia.scss";
+
+/* This file prefixes all rules with the theme name to avoid causing conflicts with other themes. */
+/* The actual styles should be defined in fi_semantum_strategia.scss */
+.fi_semantum_strategia {
+  @include addons;
+  @include fi_semantum_strategia;
+}
+
+#searchTextField {
+	background-color: #ccc;
+}
+
+#loginPasswordField {
+	background-color: #ccc;
+}
+
+#loginUsernameField {
+	background-color: #ccc;
+}
+
+div.oddProperty {
+    background-color: #dadada;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+div.evenProperty {
+    background-color: #f2f2f2;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+        div.v-app.fi_semantum_strategia {
+            font-family: "Verdana", "Chewy", "Indie Flower", "Open Sans", Candara, Optima, Arial, sans-serif;
+		}
+
+        body {
+            overflow: hidden;
+            margin: 0;
+            font-size: 12px;
+        }
+
+        .footer {
+            z-index: 1;
+            display: block;
+            font-size: 26px;
+            font-weight: 200;
+            text-shadow: 0 1px 0 #fff;
+        }
+
+        svg {
+            overflow: hidden;
+        }
+
+        rect {
+            stroke: #EEEEEE;
+        }
+
+        .label {
+            stroke: #000000;
+            fill: #000000;
+            stroke-width: 0;
+            margin: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .parent .label {
+            font-size: 12px;
+            stroke: #FFFFFF;
+            fill: #FFFFFF;
+        }
+
+        .child .label {
+            font-size: 11px;
+        }
+
+		rect.visio {
+			stroke-width: 0;
+			stroke: #000000;
+			fill: rgb(3,78,162);
+		}
+
+		rect.tavoite {
+			stroke-width: 0;
+			stroke: #000000;
+			fill: rgb(240,249,255);
+		}
+
+		rect.painopiste {
+			stroke-width: 0;
+			stroke: rgb(0,78,105);
+			fill: rgb(255,255,255);
+		}
+
+        text.header {
+            font-size: 14px;
+            text-decoration: underline;
+            text-anchor: middle;
+        }
+
+        text.visio.label {
+            font-size: 9px;
+            text-anchor: middle;
+			fill: rgb(255,255,255);
+        }
+
+        text.visio.edit {
+            font-size: 11px;
+            text-anchor: middle;
+			fill: rgb(255,255,255);
+        }
+
+        text.selectMap {
+            font-size: 9px;
+            cursor: pointer;
+            text-decoration: underline;
+			fill: rgb(42,0,255);
+        }
+
+        text.selectScope {
+            font-size: 9px;
+            cursor: pointer;
+            text-decoration: underline;
+			fill: rgb(42,0,255);
+        }
+
+        text.uusiTavoite {
+            font-size: 9px;
+        }
+
+        text.alas {
+            font-size: 12px;
+            text-anchor: middle;
+        }
+
+        text.tavoiteTag {
+            font-size: 7px;
+        }
+
+        text.painopisteTag {
+            font-size: 6px;
+        }
+
+        text.painopisteMeter {
+            font-size: 8px;
+        }
+
+        text.tavoiteMeter {
+            font-size: 10px;
+        }
+
+        text.tavoite.idElement {
+            font-size: 7px;
+            text-anchor: middle;
+        }
+
+        text.tavoite.textElement {
+            font-size: 10px;
+            text-anchor: middle;
+        }
+
+        text.tavoite.FontAwesome {
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        text.painopiste.idElement {
+            font-size: 6px;
+            text-anchor: middle;
+        }
+
+        text.painopiste.FontAwesome {
+            font-size: 7px;
+            cursor: pointer;
+        }
+
+        text.painopiste.textElement {
+            font-size: 9px;
+            text-anchor: middle;
+        }
+
+        text.alikartta.link {
+            font-size: 11px;
+            text-anchor: middle;
+        }
+
+        text.alikartta.FontAwesome {
+            cursor: pointer;
+        }
+
+        text.parents.link {
+            font-size: 7px;
+        }
+
+        path.header {
+            stroke-width: 2;
+            stroke: #000000;
+        }
+
+        path.visio {
+            stroke-width: 2;
+            stroke: #000000;
+			fill: rgb(0,0,80);
+        }
+
+		text.uusiAliorganisaatio {
+            font-size: 9px;
+		}
+
+        .remove {
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .add {
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .link {
+            cursor: pointer;
+            text-decoration: underline;
+			fill: rgb(42,0,255);
+        }
+        
+        div.v-app.fi_semantum_strategia {
+ 		   background-color: #FFFFFF;
+		}
+		
+		.removeIcon .v-icon {
+        color: red;
+        font-size: 28px;
+        line-height: 0px;
+        }
+
+        div.propertyName.v-label.v-label-propertyName {
+        color: rgb(42,0,255);
+        font-size: 20px;
+        }
+        
+.fi_semantum_strategia .v-margin-top {
+	padding-top: 8px;
+}
+ .fi_semantum_strategia .v-margin-left {
+	padding-left: 12px;
+}
+ .fi_semantum_strategia .v-margin-right {
+	padding-right: 12px;
+}
+
+.v-margin-bottom {
+	padding-bottom: 8px;
+}
+
+.noLineHeight {
+    line-height: 0px !important;
+}
+
+div.redMeter.v-label.v-label-redMeter {
+color: rgb(240,10,10);
+font-size: 22px;
+}
+
+div.greenMeter.v-label.v-label-greenMeter {
+color: rgb(10,240,10);
+font-size: 22px;
+}
+
+div.yellowMeter.v-label.v-label-yellowMeter {
+color: rgb(220,197,30);
+font-size: 22px;
+}
+
+div.redBlock {
+    background-color: #ff5959;
+    margin-top: 3px;
+    margin-bottom: 3px;
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+div.yellowBlock {
+    background-color: #fff200;
+    margin-top: 3px;
+    margin-bottom: 3px;
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+div.greenBlock {
+    background-color: #45A62D;
+    margin-top: 3px;
+    margin-bottom: 3px;
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+div.propertyHeader {
+    text-align: center;
+}
+
+div.v-button.redButton {
+    box-shadow:none; 
+    color: #000000; 
+    background: #f88;
+}
+
+.fi_semantum_strategia div.v-button.redButton {
+    box-shadow:none; 
+    color: #000000; 
+    background: #ebb;
+    opacity: 1.0;
+}
+
+.fi_semantum_strategia div.v-button.greenButton {
+    box-shadow:none; 
+    color: #000000; 
+    background: #beb;
+    opacity: 1.0;
+}
+
+        
