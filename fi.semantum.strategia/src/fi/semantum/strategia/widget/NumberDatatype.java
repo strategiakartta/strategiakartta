@@ -38,6 +38,11 @@ public class NumberDatatype extends Datatype {
 	}
 	
 	@Override
+	public Object getDefaultForecast() {
+		return BigDecimal.valueOf(1);
+	}
+
+	@Override
 	public String format(Object value) {
 		if(value == null) return "<arvoa ei ole asetettu>";
 		if(!(value instanceof BigDecimal)) return "invalid value (" + value.getClass().getSimpleName() + ")";

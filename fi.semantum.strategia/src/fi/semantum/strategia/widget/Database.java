@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -34,10 +35,10 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 
-import fi.semantum.strategia.FilterUtils;
 import fi.semantum.strategia.Lucene;
 import fi.semantum.strategia.Main;
 import fi.semantum.strategia.Utils;
+import fi.semantum.strategia.filter.FilterUtils;
 
 public class Database implements Serializable {
 
@@ -154,24 +155,35 @@ public class Database implements Serializable {
 
 	transient private Date lastModified;
 	transient private Map<String,Tag> tagMap;
+	transient private String databaseId = "database";
 
 	public Account guest;
 	public Account system;
 	
-	public Database() {
+	public Database(String databaseId) {
+		this.databaseId = databaseId;
 	}
 
+	public String getDatabaseId() {
+		return databaseId;
+	}
+	
 	private void updateTags() {
 		tagMap = new HashMap<String, Tag>();
 		for(Tag t : Tag.enumerate(this)) tagMap.put(t.getId(this), t);
 	}
 
+	public String createHue() {
+		String color = hues[tagNumber % hues.length];
+		tagNumber++;
+		return color;
+	}
+	
 	public Tag getOrCreateTag(String id) {
 		updateTags();
 		Tag result = tagMap.get(id);
 		if(result == null) {
-			String color = hues[tagNumber % hues.length];
-			tagNumber++;
+			String color = createHue();
 			result = Tag.create(this, id, id, color);
 			updateTags();
 		}
@@ -181,7 +193,7 @@ public class Database implements Serializable {
 	public void save() {
 		synchronized(Database.class) {
 			try {
-				File f = new File("database");
+				File f = new File(Main.baseDirectory(), databaseId);
 				FileOutputStream fileOut = new FileOutputStream(f);
 				ObjectOutputStream out = new ObjectOutputStream(fileOut);
 				out.writeObject(this);
@@ -201,11 +213,11 @@ public class Database implements Serializable {
 	// 5 min backup
 	private static final long BACKUP_CYCLE_MS = 5*60*1000;
 	
-	private static void touchBackup() {
+	private void touchBackup() {
 	
 		try {
 			
-			File f = new File("backup-data");
+			File f = new File(Main.baseDirectory(), "backup-data-" + databaseId);
 			if(!f.exists()) {
 				f.createNewFile();
 			}
@@ -217,11 +229,11 @@ public class Database implements Serializable {
 
 				f.setLastModified(now);
 
-				String fileName = UUID.randomUUID().toString();
+				String fileName = databaseId + "-" + UUID.randomUUID().toString();
 				
 				java.nio.file.Files.copy( 
-						new java.io.File("database").toPath(), 
-						new java.io.File(fileName).toPath(),
+						new java.io.File(Main.baseDirectory(), databaseId).toPath(), 
+						new java.io.File(Main.baseDirectory(), fileName).toPath(),
 						java.nio.file.StandardCopyOption.REPLACE_EXISTING,
 						java.nio.file.StandardCopyOption.COPY_ATTRIBUTES,
 						java.nio.file.LinkOption.NOFOLLOW_LINKS );
@@ -241,14 +253,143 @@ public class Database implements Serializable {
 
 	}
 	
+	public static void validate(Main main) {
+
+		boolean changed = false;
+		Database database = main.getDatabase();
+		List<Base> toBeRemoved = new ArrayList<Base>();
+		for(Base b : database.enumerate()) {
+			if(b instanceof ObjectType) continue;
+			if(b instanceof Property) continue;
+			if(b instanceof Relation) continue;
+			if(b instanceof Tag) continue;
+			if(b instanceof Datatype) continue;
+			if(b instanceof Account) continue;
+			if(b instanceof ResponsibilityModel) continue;
+			if(b instanceof ResponsibilityInstance) continue;
+			if(b instanceof TimeConfiguration) continue;
+			try {
+				database.getMap(b);
+			} catch (Exception e) {
+				toBeRemoved.add(b);
+				changed = true;
+			}
+		}
+		
+		Set<String> enumerationNamesToRemove = new HashSet<String>();
+		enumerationNamesToRemove.add("Hallituksen vuosikertomus");
+		enumerationNamesToRemove.add("Kyllä/Ei");
+		enumerationNamesToRemove.add("Valtion tulostietojärjestelmä");
+		Set<Base> datatypesToRemove = new HashSet<Base>();
+		
+        List<Datatype> types = Datatype.enumerate(database);
+        for(Datatype dt : types) {
+        	if(dt instanceof EnumerationDatatype) {
+        		String id = dt.getId(database);
+        		if(enumerationNamesToRemove.contains(id)) {
+        			datatypesToRemove.add(dt);
+					changed = true;
+        		}
+        	}
+        }
+        
+        for(Meter m : Meter.enumerate(database)) {
+			Indicator i = m.getPossibleIndicator(database);
+			if(i != null) {
+				Datatype dt = i.getDatatype(database);
+				if(datatypesToRemove.contains(dt)) {
+					toBeRemoved.add(m);
+					changed = true;
+				}
+			} else {
+				toBeRemoved.add(m);
+				changed = true;
+			}
+			Base owner = m.getOwner(database);
+			if(owner instanceof Strategiakartta) {
+				toBeRemoved.add(m);
+				changed = true;
+			}
+        }
+        
+		for(Indicator i : Indicator.enumerate(database)) {
+			Datatype datatype = i.getDatatype(database);
+			if(datatypesToRemove.contains(datatype)) {
+				for(Meter meter : Meter.enumerate(database)) {
+					Indicator indicator = meter.getPossibleIndicator(database);
+					if(i.equals(indicator)) {
+						toBeRemoved.add(i);
+						toBeRemoved.add(meter);
+						changed = true;
+					}
+				}
+			}
+		}
+		
+		for(Base b : toBeRemoved) {
+			database.remove(b);
+		}
+		
+		for(Base b : datatypesToRemove) {
+			database.remove(b);
+		}
+
+		if(changed) {
+			database.save();
+		}
+		
+	}
+		
 	public static void migrate(Main main, Map<String, EnumerationDatatype> enumerations) {
 		
 		Database database = main.getDatabase();
 		
 		main.account = Account.find(database, "System");
 		
+		TimeConfiguration tc = TimeConfiguration.getInstance(database);
+		if(tc == null) {
+			TimeConfiguration.create(database, "2016-2020");
+		}
+		
 		boolean migrated = false;
 
+		if(Relation.find(database, Relation.RESPONSIBILITY_INSTANCE) == null) {
+			Relation.create(database, Relation.RESPONSIBILITY_INSTANCE);
+			migrated = true;
+		}
+		
+		if(Relation.find(database, Relation.RESPONSIBILITY_MODEL) == null) {
+			Relation.create(database, Relation.RESPONSIBILITY_MODEL);
+			migrated = true;
+		}
+		
+		if(Relation.find(database, Relation.TAVOITE_SUBMAP) == null) {
+			Relation.create(database, Relation.TAVOITE_SUBMAP);
+			migrated = true;
+		}
+
+
+		
+		if(Property.find(database, Property.CHARACTER_DESCRIPTION) == null) {
+			Property.create(database, Property.CHARACTER_DESCRIPTION, null, false, Collections.<String>emptyList());
+			migrated = true;
+		}
+
+		if(Property.find(database, Property.GOAL_DESCRIPTION) == null) {
+			Property.create(database, Property.GOAL_DESCRIPTION, null, false, Collections.<String>emptyList());
+			migrated = true;
+		}
+		
+		if(Property.find(database, Property.LINK_WITH_PARENT) == null) {
+			Property.create(database, Property.LINK_WITH_PARENT, null, false, Collections.<String>emptyList());
+			migrated = true;
+		}
+
+		if(Property.find(database, Property.LINK_GOALS_AND_SUBMAPS) == null) {
+			Property.create(database, Property.LINK_GOALS_AND_SUBMAPS, null, false, Collections.<String>emptyList());
+			migrated = true;
+		}
+		
 		if(Relation.find(database, Relation.RELATED_TO_TAG) == null) {
 			Relation.create(database, Relation.RELATED_TO_TAG);
 			migrated = true;
@@ -258,17 +399,6 @@ public class Database implements Serializable {
 			
 			Property ownGoalTypeProperty = Property.create(database, Property.OWN_GOAL_TYPE, null, false, Collections.<String>emptyList());
 			ObjectType painopiste = ObjectType.find(database, ObjectType.PAINOPISTE);
-			ObjectType toimenpide = ObjectType.find(database, ObjectType.TOIMENPIDE);
-			
-			ObjectType typeVirasto = ObjectType.find(database, ObjectType.VIRASTO);
-			typeVirasto.properties.add(ownGoalTypeProperty.make(painopiste.uuid));
-			
-			ObjectType typeVirastoOsasto = ObjectType.find(database, ObjectType.VIRASTO_OSASTO);
-			typeVirastoOsasto.properties.add(ownGoalTypeProperty.make(toimenpide.uuid));
-			
-			ObjectType typeKokoavaYksikko = ObjectType.find(database, ObjectType.KOKOAVA_YKSIKKO);
-			typeKokoavaYksikko.properties.add(ownGoalTypeProperty.make(toimenpide.uuid));
-
 			migrated = true;
 			
 		}
@@ -308,20 +438,109 @@ public class Database implements Serializable {
 
         }
 		
-		Tag voimavarat = database.getOrCreateTag(Tag.VOIMAVARAT);
-		for(Strategiakartta map : FilterUtils.filterByType(database, Strategiakartta.enumerate(database), ObjectType.VIRASTO)) {
-			if(map.voimavarat == null) {
-				Tavoite t = Tavoite.create(database, map, "Voimavarat");
-				map.removeTavoite(database, t);
-				t.assertRelatedTags(database, voimavarat);
-				map.voimavarat = t;
+		Property levelProperty = Property.find(database, Property.LEVEL);
+		for(Strategiakartta map : Strategiakartta.enumerate(database)) {
+			ObjectType level = database.find((String)levelProperty.getPropertyValue(map));
+			if(level == null) {
+				database.remove(map);
 				migrated = true;
 			}
 		}
 		
+		Property characterDescriptionP = Property.find(database, Property.CHARACTER_DESCRIPTION);
+		Property goalDescriptionP = Property.find(database, Property.GOAL_DESCRIPTION);
+		Property characterColorP = Property.find(database, Property.CHARACTER_COLOR);
+		Property characterTextColorP = Property.find(database, Property.CHARACTER_TEXT_COLOR);
+		Property focusType = Property.find(database, Property.FOCUS_TYPE);
+		
+		for(Base levelType : Strategiakartta.availableLevels(database)) {
+			String focusDescription = characterDescriptionP.getPropertyValue(levelType);
+			if(focusDescription == null) {
+				Base painopisteType = (Base)database.find(focusType.getPropertyValue(levelType));
+				if(painopisteType != null) {
+					String painopisteDescription = painopisteType.getText(database);
+					characterDescriptionP.set(null, database, levelType, painopisteDescription);
+					goalDescriptionP.set(null, database, levelType, "");
+					String painopisteColor = characterColorP.getPropertyValue(painopisteType);
+					characterColorP.set(null, database, levelType, painopisteColor);
+					String painopisteTextColor = characterTextColorP.getPropertyValue(painopisteType);
+					characterTextColorP.set(null, database, levelType, painopisteTextColor);
+					migrated = true;
+				}
+			}
+		}
+		
+		for(Strategiakartta map : Strategiakartta.enumerate(database)) {
+			
+			List<Linkki> ls = new ArrayList<Linkki>();
+			for(Linkki l : map.alikartat) {
+				Strategiakartta k = database.find(l.uuid);
+				if(k == null) {
+					ls.add(l);
+				}
+			}
+			
+			for(Linkki l : ls) {
+				map.removeAlikartta(l.uuid);
+				migrated = true;
+			}
+
+		}
+		
+		for(Tavoite t : Tavoite.enumerate(database)) {
+			try {
+				if(t.ensureImplementationMap(main))
+					migrated = true;
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+        
+		for(Strategiakartta map : Strategiakartta.enumerate(database)) {
+			try {
+				Base sub = map.getPossibleSubmapType(database);
+				if(sub != null) {
+					Set<Strategiakartta> proper = new HashSet<Strategiakartta>();
+					for(Tavoite t : map.tavoitteet) {
+						try {
+							Strategiakartta imp = t.getPossibleImplementationMap(database);
+							if(imp != null) proper.add(imp);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					}
+					for(Linkki l : map.alikartat) {
+						Strategiakartta map2 = database.find(l.uuid);
+						if(!proper.contains(map2)) {
+							database.remove(map2);
+							migrated = true;
+						}
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		
+//		Tag voimavarat = database.getOrCreateTag(Tag.VOIMAVARAT);
+//		for(Strategiakartta map : FilterUtils.filterByType(database, Strategiakartta.enumerate(database), ObjectType.VIRASTO)) {
+//			if(map.voimavarat == null) {
+//				Tavoite t = Tavoite.create(database, map, "Voimavarat");
+//				map.removeTavoite(database, t);
+//				t.assertRelatedTags(database, voimavarat);
+//				map.voimavarat = t;
+//				migrated = true;
+//			}
+//		}
+		
 		// Migration
 		for(Base b : new ArrayList<Base>(database.enumerate())) {
-			migrated |= b.migrate(main);
+			if(b.migrate(main))
+				migrated = true;
+//			if(migrated) {
+//				b.migrate(main);
+//			}
 		}
 
 		if(migrated) {
@@ -332,7 +551,7 @@ public class Database implements Serializable {
 		
 	}
 	
-	public static Database load(Main main) {
+	public static Database load(Main main, String databaseId) {
 
 		Database result = null;
 
@@ -343,7 +562,7 @@ public class Database implements Serializable {
 				Map<String,EnumerationDatatype> enumerations = new HashMap<String, EnumerationDatatype>();
 				
 				try {
-					File file = new File("database.xlsx");
+					File file = new File(Main.baseDirectory(), "database.xlsx");
 					FileInputStream fis = new FileInputStream(file);
 					Workbook book = WorkbookFactory.create(fis);
 					fis.close();
@@ -375,43 +594,46 @@ public class Database implements Serializable {
 				} catch (Exception e) {
 				}
 				
-				File f = new File("database");
+				File f = new File(Main.baseDirectory(), databaseId);
 				FileInputStream fileIn = new FileInputStream(f);
 				ObjectInputStream in = new ObjectInputStream(fileIn);
 				result = (Database) in.readObject();
 				in.close();
 				fileIn.close();
-				
+
+				result.databaseId = databaseId;
+
 				main.setDatabase(result);
 				
 				migrate(main, enumerations);
+				validate(main);
 				
 				result.lastModified = new Date(f.lastModified());
 				
 			} catch(IOException i) {
 				
 				i.printStackTrace();
-				result = create(main);
+				result = create(main, databaseId);
 				
 			} catch(ClassNotFoundException c) {
 				
 				System.out.println("Database class not found");
 				c.printStackTrace();
-				result = create(main);
+				result = create(main, databaseId);
 				
 			}
 			
-			touchBackup();
+			result.touchBackup();
 
 			result.updateTags();
 
 			try {
 			
-				if(!Lucene.indexExists()) {
+				if(!Lucene.indexExists(databaseId)) {
 					
-					Lucene.startWrite();
+					Lucene.startWrite(databaseId);
 					for(Base b : result.enumerate()) {
-						Lucene.set(b.uuid, b.searchText(result));
+						Lucene.set(databaseId, b.uuid, b.searchText(result));
 					}
 					Lucene.endWrite();
 					
@@ -430,10 +652,18 @@ public class Database implements Serializable {
 	}
 
 	public boolean checkChanges() {
-
-		File f = new File("database");
+		
+		File f = new File(Main.baseDirectory(), databaseId);
 		Date d = new Date(f.lastModified());
-		return d.compareTo(lastModified) > 0;
+		
+		int comp = d.compareTo(lastModified);
+		
+		if(comp > 0) {
+			//System.err.println("Changed: " + lastModified + " vs. " + d);
+			return true;
+		} else {
+			return false;
+		}
 
 	}
 
@@ -452,6 +682,20 @@ public class Database implements Serializable {
 		return null;
 	}
 
+	public Collection<Base> instances(ObjectType type) {
+		Property typeProperty = Property.find(this, Property.TYPE);
+		ArrayList<Base> result = new ArrayList<Base>();
+		for(Base b : objects.values()) {
+			Base t = typeProperty.getPropertyValueObject(this, b);
+			if(t != null) {
+				if(type.uuid == t.uuid) {
+					result.add(b);
+				}
+			}
+		}
+		return result;
+	}
+	
 	public Collection<Base> enumerate() {
 		return objects.values();
 	}
@@ -469,7 +713,7 @@ public class Database implements Serializable {
 
 		Account owner = Account.find(database, "System");
 
-		Pair p1 = Pair.make(Property.find(database, Property.LEVEL).uuid, level.getId(database));
+		Pair p1 = Pair.make(Property.find(database, Property.LEVEL).uuid, level.uuid);
 		Pair p3 = Pair.make(Property.find(database, Property.OWNER).uuid, owner.getId(database));
 		Pair p4 = Pair.make(Property.find(database, Property.EMAIL).uuid, "");
 		Pair p5 = Pair.make(Property.find(database, Property.CHANGED_ON).uuid, Utils.sdf.format(new Date()));
@@ -483,8 +727,8 @@ public class Database implements Serializable {
 
 		Account owner = Account.find(database, "System");
 
-		ObjectType toimenpide = ObjectType.find(database, ObjectType.TOIMENPIDE);
-		ObjectType toimialanToimenpide = ObjectType.find(database, ObjectType.TOIMIALAN_TOIMENPIDE);
+//		ObjectType toimenpide = ObjectType.find(database, ObjectType.TOIMENPIDE);
+//		ObjectType toimialanToimenpide = ObjectType.find(database, ObjectType.TOIMIALAN_TOIMENPIDE);
 		Property levelProperty = Property.find(database, Property.LEVEL);
 		ObjectType level = database.find((String)levelProperty.getPropertyValue(map));
 
@@ -493,9 +737,9 @@ public class Database implements Serializable {
 
 		ArrayList<Pair> result = new ArrayList<Pair>();
 
-		if(toimialanToimenpide.uuid.equals(goalTypeUUID) || toimenpide.uuid.equals(goalTypeUUID))
-			result.add(Pair.make(Property.find(database, Property.AIKAVALI).uuid, "Kaikki"));
+//		if(toimialanToimenpide.uuid.equals(goalTypeUUID) || toimenpide.uuid.equals(goalTypeUUID))
 
+    	result.add(Pair.make(Property.find(database, Property.AIKAVALI).uuid, "Kaikki"));
 		result.add(Pair.make(Property.find(database, Property.OWNER).uuid, owner.uuid));
 		result.add(Pair.make(Property.find(database, Property.EMAIL).uuid, ""));
 		result.add(Pair.make(Property.find(database, Property.CHANGED_ON).uuid, Utils.sdf.format(new Date())));
@@ -509,20 +753,20 @@ public class Database implements Serializable {
 
 		Account owner = Account.find(database, "System");
 
-		ObjectType toimenpide = ObjectType.find(database, ObjectType.TOIMENPIDE);
-		ObjectType toimialanToimenpide = ObjectType.find(database, ObjectType.TOIMIALAN_TOIMENPIDE);
-		ObjectType vastuuhenkilo = ObjectType.find(database, ObjectType.VASTUUHENKILO);
+//		ObjectType toimenpide = ObjectType.find(database, ObjectType.TOIMENPIDE);
+//		ObjectType toimialanToimenpide = ObjectType.find(database, ObjectType.TOIMIALAN_TOIMENPIDE);
+//		ObjectType vastuuhenkilo = ObjectType.find(database, ObjectType.VASTUUHENKILO);
 		Property levelProperty = Property.find(database, Property.LEVEL);
 		ObjectType level = database.find((String)levelProperty.getPropertyValue(map));
 
-		Property focusTypeProperty = Property.find(database, Property.FOCUS_TYPE);
-		String focusTypeUUID = focusTypeProperty.getPropertyValue(level);
+//		Property focusTypeProperty = Property.find(database, Property.FOCUS_TYPE);
+//		String focusTypeUUID = focusTypeProperty.getPropertyValue(level);
 
 		ArrayList<Pair> result = new ArrayList<Pair>();
 
-		if(toimenpide.uuid.equals(focusTypeUUID) || toimialanToimenpide.uuid.equals(focusTypeUUID) || vastuuhenkilo.uuid.equals(focusTypeUUID))
-			result.add(Pair.make(Property.find(database, Property.AIKAVALI).uuid, Property.AIKAVALI_KAIKKI));
+//		if(toimenpide.uuid.equals(focusTypeUUID) || toimialanToimenpide.uuid.equals(focusTypeUUID) || vastuuhenkilo.uuid.equals(focusTypeUUID))
 		
+		result.add(Pair.make(Property.find(database, Property.AIKAVALI).uuid, Property.AIKAVALI_KAIKKI));
 		result.add(Pair.make(Property.find(database, Property.OWNER).uuid, owner.uuid));
 		result.add(Pair.make(Property.find(database, Property.EMAIL).uuid, ""));
 		result.add(Pair.make(Property.find(database, Property.CHANGED_ON).uuid, Utils.sdf.format(new Date())));
@@ -536,34 +780,49 @@ public class Database implements Serializable {
 		database.register(new NumberDatatype(database));
 	}
 	
-	private static Database create(Main main) {
+	private static Database create(Main main, String databaseId) {
 
 		try {
 			
-			Lucene.startWrite();
+			Lucene.startWrite(databaseId);
 
 			Strategiakartta hallinnonala;
 
-			Database result = new Database();
+			Database result = new Database(databaseId);
+			result.databaseId = databaseId;
 			main.setDatabase(result);
+
+			TimeConfiguration tc = TimeConfiguration.getInstance(result);
+			if(tc == null) {
+				TimeConfiguration.create(result, "2016-2020");
+			}
 
 			Relation.create(result, Relation.RELATED_TO_TAG);
 
 			Relation.create(result, Relation.IMPLEMENTS);
 			Relation.create(result, Relation.COPY);
 			Relation.create(result, Relation.MEASURES);
+			Relation.create(result, Relation.RESPONSIBILITY_INSTANCE);
+			Relation.create(result, Relation.RESPONSIBILITY_MODEL);
 			
 			Relation allowsSubmap = Relation.create(result, Relation.ALLOWS_SUBMAP);
 			Relation.create(result, Relation.MONITORS_TAG);
+			
+			Relation.create(result, Relation.TAVOITE_SUBMAP);
 
 			Property goalTypeProperty = Property.create(result, Property.GOAL_TYPE, null, false, Collections.<String>emptyList());
 			Property ownGoalTypeProperty = Property.create(result, Property.OWN_GOAL_TYPE, null, false, Collections.<String>emptyList());
 			Property focusTypeProperty = Property.create(result, Property.FOCUS_TYPE, null, false, Collections.<String>emptyList());
 			Property characterColor = Property.create(result, Property.CHARACTER_COLOR, null, false, Collections.<String>emptyList());
 			Property characterTextColor = Property.create(result, Property.CHARACTER_TEXT_COLOR, null, false, Collections.<String>emptyList());
+
+			Property.create(result, Property.CHARACTER_DESCRIPTION, null, false, Collections.<String>emptyList());
+			Property.create(result, Property.GOAL_DESCRIPTION, null, false, Collections.<String>emptyList());
+			Property.create(result, Property.LINK_WITH_PARENT, null, false, Collections.<String>emptyList());
+			Property.create(result, Property.LINK_GOALS_AND_SUBMAPS, null, false, Collections.<String>emptyList());			
 			
-			Property manyImplements = Property.create(result, Property.MANY_IMPLEMENTS, null, true, Collections.<String>emptyList());
-			Property manyImplementor = Property.create(result, Property.MANY_IMPLEMENTOR, null, true, Collections.<String>emptyList());
+//			Property manyImplements = Property.create(result, Property.MANY_IMPLEMENTS, null, true, Collections.<String>emptyList());
+//			Property manyImplementor = Property.create(result, Property.MANY_IMPLEMENTOR, null, true, Collections.<String>emptyList());
 			
 			Property type = Property.create(result, Property.TYPE, null, false, Collections.<String>emptyList());
 
@@ -572,15 +831,16 @@ public class Database implements Serializable {
 			ObjectType strateginenTavoite = ObjectType.create(result, ObjectType.STRATEGINEN_TAVOITE);
 			strateginenTavoite.properties.add(characterColor.make("#034ea2"));
 			strateginenTavoite.properties.add(characterTextColor.make("#fff"));
-			strateginenTavoite.properties.add(manyImplements.make("false")); // toteuttaa useampaa
-			strateginenTavoite.properties.add(manyImplementor.make("true")); // useampi toteuttaa
+//			strateginenTavoite.properties.add(manyImplements.make("false")); // toteuttaa useampaa
+//			strateginenTavoite.properties.add(manyImplementor.make("true")); // useampi toteuttaa
 			
 			ObjectType painopiste = ObjectType.create(result, ObjectType.PAINOPISTE);
 			painopiste.properties.add(characterColor.make("#3681D5"));
 			painopiste.properties.add(characterTextColor.make("#000"));
-			painopiste.properties.add(manyImplements.make("false")); // toteuttaa useampaa
-			painopiste.properties.add(manyImplementor.make("true")); // useampi toteuttaa
-			
+//			painopiste.properties.add(manyImplements.make("false")); // toteuttaa useampaa
+//			painopiste.properties.add(manyImplementor.make("true")); // useampi toteuttaa
+
+			/*
 			ObjectType tulostavoite = ObjectType.create(result, ObjectType.TULOSTAVOITE);
 			tulostavoite.properties.add(characterColor.make("#69B4ff"));
 			tulostavoite.properties.add(characterTextColor.make("#000"));
@@ -610,14 +870,23 @@ public class Database implements Serializable {
 			vastuuhenkilo.properties.add(characterTextColor.make("#000"));
 			vastuuhenkilo.properties.add(manyImplements.make("true")); // toteuttaa useampaa
 			vastuuhenkilo.properties.add(manyImplementor.make("true")); // useampi toteuttaa
+			*/
 			
 			ObjectType typeHallinnonala = ObjectType.create(result, ObjectType.HALLINNONALA);
 			typeHallinnonala.properties.add(type.make(levelType.uuid));
 			typeHallinnonala.properties.add(goalTypeProperty.make(strateginenTavoite.uuid));
 			typeHallinnonala.properties.add(focusTypeProperty.make(painopiste.uuid));
-			typeHallinnonala.properties.add(characterColor.make("#CA6446"));
+			typeHallinnonala.properties.add(characterColor.make("#3681D5"));
 			typeHallinnonala.properties.add(characterTextColor.make("#000"));
 			
+			Property characterDescriptionP = Property.find(result, Property.CHARACTER_DESCRIPTION);
+			Property goalDescriptionP = Property.find(result, Property.GOAL_DESCRIPTION);
+
+			typeHallinnonala.properties.add(characterDescriptionP.make("Painopiste"));
+			typeHallinnonala.properties.add(goalDescriptionP.make("Strateginen tavoite"));
+
+			
+			/*
 			ObjectType typeVirasto = ObjectType.create(result, ObjectType.VIRASTO);
 			typeVirasto.properties.add(type.make(levelType.uuid));
 			typeVirasto.properties.add(ownGoalTypeProperty.make(painopiste.uuid));
@@ -674,21 +943,22 @@ public class Database implements Serializable {
 			typeRyhma.properties.add(focusTypeProperty.make(vastuuhenkilo.uuid));
 			typeRyhma.properties.add(characterColor.make("#AA6446"));
 			typeRyhma.properties.add(characterTextColor.make("#000"));
+			*/
 
-			typeHallinnonala.addRelation(allowsSubmap, typeVirasto);
-			
-			typeVirasto.addRelation(allowsSubmap, typeLVMOsasto);
-			typeVirasto.addRelation(allowsSubmap, typeToimiala);
-			
-			typeToimiala.addRelation(allowsSubmap, typeVirastoOsasto);
-			typeToimiala.addRelation(allowsSubmap, typeKokoavaYksikko);
-			typeToimiala.addRelation(allowsSubmap, typeRyhma);
-
-			typeLVMOsasto.addRelation(allowsSubmap, typeToteuttavaYksikko);
-			
-			typeVirastoOsasto.addRelation(allowsSubmap, typeToteuttavaYksikko);
-
-			typeKokoavaYksikko.addRelation(allowsSubmap, typeRyhma);
+//			typeHallinnonala.addRelation(allowsSubmap, typeVirasto);
+//			
+//			typeVirasto.addRelation(allowsSubmap, typeLVMOsasto);
+//			typeVirasto.addRelation(allowsSubmap, typeToimiala);
+//			
+//			typeToimiala.addRelation(allowsSubmap, typeVirastoOsasto);
+//			typeToimiala.addRelation(allowsSubmap, typeKokoavaYksikko);
+//			typeToimiala.addRelation(allowsSubmap, typeRyhma);
+//
+//			typeLVMOsasto.addRelation(allowsSubmap, typeToteuttavaYksikko);
+//			
+//			typeVirastoOsasto.addRelation(allowsSubmap, typeToteuttavaYksikko);
+//
+//			typeKokoavaYksikko.addRelation(allowsSubmap, typeRyhma);
 
 			createDatatypes(result);
 
@@ -702,7 +972,7 @@ public class Database implements Serializable {
 			Property.create(result, Property.TTL, null, false, Collections.<String>emptyList());
 
 			result.guest = Account.create(result, "Guest", "", Utils.hash(""));
-			result.system = Account.create(result, "System", "contact@semantum.fi", Utils.hash("system"));
+			result.system = Account.create(result, "System", "contact@semantum.fi", Utils.hash(""));
 			result.system.setAdmin(true);
 
 			Tag LIIKENNE = result.getOrCreateTag(Tag.LIIKENNE);
@@ -799,10 +1069,13 @@ public class Database implements Serializable {
 
 	}
 
-	public Strategiakartta newMap(Main main, Strategiakartta map, String id, String name, Base level) {
+	public Strategiakartta newMap(Main main, Strategiakartta parent, String id, String name, Base level) {
 
 		Strategiakartta newMap = Strategiakartta.create(main, id, name, "", EMPTY, mapProperties(this, level));
-		map.addAlikartta(newMap);
+		if(parent != null) {
+			parent.addAlikartta(newMap);
+			newMap.showVision = parent.showVision; 
+		}
 		return newMap;
 
 	}
@@ -834,9 +1107,14 @@ public class Database implements Serializable {
 		if(t != null)
 			b.properties.add(Pair.make(Property.find(this, Property.TYPE).uuid, t.uuid));
 
+		Property aika = Property.find(this, Property.AIKAVALI);
+		String validity = aika.getPropertyValue(b);
+		if(validity == null)
+			aika.set(null, this, b, Property.AIKAVALI_KAIKKI);
+
 		objects.put(b.uuid, b);
 		try {
-			Lucene.set(b.uuid, b.searchText(this));
+			Lucene.set(databaseId, b.uuid, b.searchText(this));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -869,7 +1147,7 @@ public class Database implements Serializable {
 		return null;
 	}
 	
-	public Strategiakartta getMap(Base b) {
+	public Strategiakartta getMap(Base b) throws RuntimeException {
 		if (b instanceof Strategiakartta) {
 			return (Strategiakartta)b;
 		}
@@ -913,12 +1191,19 @@ public class Database implements Serializable {
 		} else if (b instanceof Indicator) {
 			for(Base b2 : enumerate()) {
 				for(Indicator i : b2.getIndicators(this)) {
-					if(i.equals(b))
+					if(i.equals(b)) {
 						return getMap(b2);
+					}
+				}
+			}
+			for(Meter m : Meter.enumerate(this)) {
+				Indicator i = m.getPossibleIndicator(this);
+				if(b.equals(i)) {
+					return getMap(m);
 				}
 			}
 		}
-		return null;
+		throw new RuntimeException("No map for " + b);
 	}
 
 	public String getType(Base b) {

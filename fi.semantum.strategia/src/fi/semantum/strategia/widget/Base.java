@@ -15,6 +15,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -32,7 +33,7 @@ import fi.semantum.strategia.Utils;
  * Common base class for all objects in a database
  * 
  */
-abstract public class Base implements Serializable, Comparable<Base> {
+abstract public class Base implements Serializable, Baseable, Comparable<Base> {
 	
 	private static final long serialVersionUID = -4482518287842093370L;
 	
@@ -111,6 +112,14 @@ abstract public class Base implements Serializable, Comparable<Base> {
 		
 	}
 	
+	public String getShortText(Database database) {
+		String id = getId(database);
+		if(!id.isEmpty()) return id;
+		String text = getText(database);
+		if(text.length() > 30) text = text.substring(0, 30);
+		return text;
+	}
+	
 	public String getCaption(Database database) {
 		String id = getId(database);
 		String caption = getText(database);
@@ -125,8 +134,14 @@ abstract public class Base implements Serializable, Comparable<Base> {
 		}
 	}
 	
+	public String getLabel(Database database) {
+		String label = getId(database);
+		if(label.isEmpty()) label = getText(database);
+		return label;
+	}
+	
 	public String getDescription(Database database) {
-		if(description == null || description.isEmpty()) return "ei m‰‰rityst‰";
+		if(description == null || description.isEmpty()) return "";
 		return description;
 	}
 	
@@ -250,6 +265,13 @@ abstract public class Base implements Serializable, Comparable<Base> {
 		return new ArrayList<Meter>(meters);
 	}
 
+	public Meter getPossiblePrincipalMeterActive(Main main) {
+		for(Meter m : getMetersActive(main)) {
+			if(m.isPrincipal) return m;
+		}
+		return null;
+	}
+	
 	public List<Meter> getMetersActive(Main main) {
 			
 		ArrayList<Meter> pps = new ArrayList<Meter>();
@@ -281,27 +303,37 @@ abstract public class Base implements Serializable, Comparable<Base> {
 		}
 		return false;
 	}
+	
+	public static Comparator<Tag> tagComparator = new Comparator<Tag>() {
+
+		@Override
+		public int compare(Tag o1, Tag o2) {
+			return String.CASE_INSENSITIVE_ORDER.compare(o1.id, o2.id);
+		}
+		
+	};
 
 	public List<Tag> getRelatedTags(Database database) {
 		Relation r = Relation.find(database, Relation.RELATED_TO_TAG);
 		if(r == null) return Collections.emptyList();
-		return new ArrayList<Tag>(this.<Tag>getRelatedObjects(database, r));
+		List<Tag> result = new ArrayList<Tag>(this.<Tag>getRelatedObjects(database, r));
+		Collections.sort(result, tagComparator);
+		return result; 
 	}
 
 	public List<Tag> getMonitorTags(Database database) {
 		Relation r = Relation.find(database, Relation.MONITORS_TAG);
 		if(r == null) return Collections.emptyList();
-		return new ArrayList<Tag>(this.<Tag>getRelatedObjects(database, r));
+		List<Tag> result = new ArrayList<Tag>(this.<Tag>getRelatedObjects(database, r));
+		Collections.sort(result, tagComparator);
+		return result; 
 	}
 	
-	public void removeRelatedTags(Database database, Collection<Tag> tags) {
-		for(Tag t : tags)
-			denyRelation(database, Relation.find(database, Relation.RELATED_TO_TAG), t);
-	}
-
 	public void removeRelatedTags(Database database, Tag ...tags) {
-		for(Tag t : tags)
+		for(Tag t : tags) {
 			denyRelation(database, Relation.find(database, Relation.RELATED_TO_TAG), t);
+			denyRelation(database, Relation.find(database, Relation.MONITORS_TAG), t);
+		}
 	}
 
 	public void removeMonitorTags(Database database, Tag ...tags) {
@@ -310,7 +342,10 @@ abstract public class Base implements Serializable, Comparable<Base> {
 	}
 
 	public void setRelatedTags(Database database, Collection<Tag> newTags) {
-		removeRelatedTags(database, getRelatedTags(database));
+		List<Tag> existing = getRelatedTags(database);
+		for(Tag exist : existing)
+			if(!newTags.contains(exist))
+				removeRelatedTags(database, exist);
 		assertRelatedTags(database, newTags);
 	}
 	
@@ -343,7 +378,12 @@ abstract public class Base implements Serializable, Comparable<Base> {
 	}
 
 	public String getText(Database database) {
+		
+		Base copy = getPossibleCopy(database);
+		if(copy != null) return copy.getText(database);
+		
 		return text;
+		
 	}
 	
 	public void setText() {
@@ -375,9 +415,12 @@ abstract public class Base implements Serializable, Comparable<Base> {
 
 	public boolean modifyText(Main main, Account account, String text) {
 
+		Database database = main.getDatabase();
+		Base copy = getPossibleCopy(database);
+		if(copy != null)
+			return copy.modifyText(main, account, text);
+		
 		assert(text != null);
-
-		final Database database = main.getDatabase();
 
 		if(!account.canWrite(database, this))
 			return false;
@@ -386,7 +429,7 @@ abstract public class Base implements Serializable, Comparable<Base> {
 			modified(main);
 			this.text = text;
 			try {
-				Lucene.set(uuid, searchText(database));
+				Lucene.set(database.getDatabaseId(), uuid, searchText(database));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -417,7 +460,7 @@ abstract public class Base implements Serializable, Comparable<Base> {
 			modified(main);
 			this.description = text;
 			try {
-				Lucene.set(uuid, searchText(database));
+				Lucene.set(database.getDatabaseId(), uuid, searchText(database));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -448,7 +491,7 @@ abstract public class Base implements Serializable, Comparable<Base> {
 			modified(main);
 			setId(database, id);
 			try {
-				Lucene.set(uuid, searchText(database));
+				Lucene.set(database.getDatabaseId(), uuid, searchText(database));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -478,7 +521,7 @@ abstract public class Base implements Serializable, Comparable<Base> {
 			modified(main);
 			this.markup = markup;
 			try {
-				Lucene.set(uuid, searchText(database));
+				Lucene.set(database.getDatabaseId(), uuid, searchText(database));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -512,51 +555,7 @@ abstract public class Base implements Serializable, Comparable<Base> {
 		modifyText(main, database.system, copy.getText(database));
 	}
 
-	public String hexI(int i) {
-		if(i < 10) return "" + i;
-		else {
-			char offset = (char) (i-10);
-			char c = (char) ('A' + offset);
-			return "" + c;
-		}
-	}
-	
-	public String hex(double value) {
-		int i = (int)value;
-		int upper = i >> 4;
-		int lower = i & 15;
-		return hexI(upper) + hexI(lower);
-	}
-	
-	public String trafficColor(double value) {
-		
-		double redR = 218.0;
-		double redG = 37.0;
-		double redB = 29.0;
-		
-		double yellowR = 244.0;
-		double yellowG = 192.0;
-		double yellowB = 0.0;
-
-		double greenR = 0.0;
-		double greenG = 146.0;
-		double greenB = 63.0;
-		
-		if(value < 0.5) {
-			double r = (1-2.0*value)*redR + (2.0*value)*yellowR;
-			double g = (1-2.0*value)*redG + (2.0*value)*yellowG;
-			double b = (1-2.0*value)*redB + (2.0*value)*yellowB;
-			return "#" + hex(r) + hex(g) + hex(b);
-		} else {
-			double r = (2.0*value - 1)*greenR + (2 - 2.0*value)*yellowR;
-			double g = (2.0*value - 1)*greenG + (2 - 2.0*value)*yellowG;
-			double b = (2.0*value - 1)*greenB + (2 - 2.0*value)*yellowB;
-			return "#" + hex(r) + hex(g) + hex(b);
-		}
-		
-	}
-	
-	public Strategiakartta getMap(Database database) {
+	public Strategiakartta getMap(Database database) throws RuntimeException {
 		return database.getMap(this);
 	}
 	
@@ -585,6 +584,14 @@ abstract public class Base implements Serializable, Comparable<Base> {
 
 	public void assertRelation(Database database, Relation r, Base b) {
 		if(!hasRelation(database, r, b)) addRelation(r, b);
+	}
+
+	public void denyRelation(Database database, Relation r) {
+		List<Pair> toRemove = new ArrayList<Pair>();
+		for(Pair p : relations)
+			if(p.first.equals(r.uuid))
+				toRemove.add(p);
+		relations.removeAll(toRemove);
 	}
 
 	public void denyRelation(Database database, Relation r, Base b) {
@@ -616,10 +623,16 @@ abstract public class Base implements Serializable, Comparable<Base> {
 		String validity = aika.getPropertyValue(this);
 		if(validity == null || "Kaikki".equals(validity)) {
 			aika.set(null, database, this, Property.AIKAVALI_KAIKKI);
+			result = true;
 		}
 
 		return result;
 		
+	}
+	
+	@Override
+	public Base getBase() {
+		return this;
 	}
 
 	@Override
@@ -645,6 +658,49 @@ abstract public class Base implements Serializable, Comparable<Base> {
 		} else if (!uuid.equals(other.uuid))
 			return false;
 		return true;
+	}
+
+	public boolean isLeaf(Database database, String requiredValidityPeriod) {
+		
+		Collection<Base> imps = Utils.getDirectImplementors(database, this, requiredValidityPeriod);
+		return imps.isEmpty();
+		
+	}
+	
+	public Base hasLeaf(Database database, String requiredValidityPeriod) {
+
+		Collection<Base> imps = Utils.getDirectImplementors(database, this, requiredValidityPeriod);
+		if(imps.isEmpty()) return this;
+		if(imps.size() > 1) return null;
+		Base imp = imps.iterator().next();
+		
+		return imp.hasLeaf(database, requiredValidityPeriod);
+		
+	}
+	
+	public Base getImplemented(Database database) {
+
+		Relation implementsRelation = Relation.find(database, Relation.IMPLEMENTS);
+		Collection<Base> bases = getRelatedObjects(database, implementsRelation);
+		if(bases.size() == 1) return bases.iterator().next();
+		if(bases.size() > 1) throw new IllegalStateException("Implements multiple!");
+		return null;
+		
+	}
+	
+	public Base getPossibleImplemented(Database database) {
+		try {
+			return getImplemented(database);
+		} catch (IllegalStateException e) {
+			return null;
+		}
+	}
+	
+	public void removeRecursive(Database database) {
+		for(Base imp : Utils.getDirectImplementors(database, this)) {
+			imp.removeRecursive(database);
+		}
+		remove(database);
 	}
 	
 }

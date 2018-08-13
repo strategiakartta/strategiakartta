@@ -17,12 +17,14 @@ public class TimeSeriesEntry implements Serializable {
 	private static final long serialVersionUID = -2255599915523496925L;
 	
 	private Object value;
+	private Object estimate;
 	private Account account;
 	private String shortComment;
 	private String comment;
 	
-	public TimeSeriesEntry(Object value, Account account, String shortComment, String comment) {
+	public TimeSeriesEntry(Object value, Object estimate, Account account, String shortComment, String comment) {
 		this.value = value;
+		this.estimate = estimate;
 		this.account = account;
 		this.shortComment = shortComment;
 		this.comment = comment;
@@ -44,4 +46,10 @@ public class TimeSeriesEntry implements Serializable {
 		return value;
 	}
 	
+	public Object getForecast() {
+		// This is for backwards compatibility
+		if(estimate == null) return value;
+		return estimate;
+	}
+
 }

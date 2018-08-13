@@ -18,6 +18,7 @@ public class D3State extends JavaScriptComponentState {
 	
 	public MapVis model;
 	public boolean logged;
+	public boolean edit;
 
 	public void setModel(final MapVis model) {
 		this.model = model;
@@ -27,4 +28,8 @@ public class D3State extends JavaScriptComponentState {
 		this.logged = value;
 	}
 
+	public void setEdit(boolean value) {
+		this.edit = value;
+	}
+	
 }

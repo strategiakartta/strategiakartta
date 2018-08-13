@@ -38,13 +38,17 @@ public class Strategiakartta extends Base implements Serializable {
 	
 	public List<Tag> generators = new ArrayList<Tag>(); 
 	
-	public String ownGoalDescription = "";
 	public String tavoiteDescription = "";
 	public String painopisteDescription = "";
-	public String characterColor = "";
+	//public String characterColor = "";
 	public String tavoiteColor = "";
 	public String tavoiteTextColor = "";
 	public String painopisteColor = "";
+	public String painopisteTextColor = "";
+	public boolean linkWithParent = true;
+	public boolean linkGoalsAndSubmaps = false;
+	
+	public boolean showVision = true;
 	
 	private Strategiakartta(Main main, String id, String text, String visio, Collection<Pair> relations, Pair[] properties) {
 		super(UUID.randomUUID().toString(), id, text);
@@ -53,7 +57,7 @@ public class Strategiakartta extends Base implements Serializable {
 		this.relations.addAll(relations);
 		for(Pair property : properties) {
 			Property p = database.find(property.first);
-			p.set(main, this, property.second);
+			p.set(null, database, this, property.second);
 		}
 	}
 	
@@ -62,7 +66,34 @@ public class Strategiakartta extends Base implements Serializable {
 		main.getDatabase().register(p);
 		return p;
 	}
+
 	
+	@Override
+	public String getId(Database database) {
+		Base imp = getImplemented(database);
+		if(imp != null) return imp.getId(database);
+		return super.getId(database);
+	}
+	
+	@Override
+	public String getText(Database database) {
+		Base imp = getImplemented(database);
+		if(imp != null) return imp.getText(database);
+		return super.getText(database);
+	}
+
+	@Override
+	public boolean modifyText(Main main, Account account, String text) {
+		
+		Database database = main.getDatabase();
+		Base imp = getImplemented(database);
+		if(imp != null)
+			return imp.modifyText(main, account, text);
+
+		return super.modifyText(main, account, text);
+		
+	}
+
 	@Override
 	public Base getOwner(Database database) {
 		return getPossibleParent(database);
@@ -205,7 +236,7 @@ public class Strategiakartta extends Base implements Serializable {
 			
 			try {
 				
-				Lucene.startWrite();
+				Lucene.startWrite(database.getDatabaseId());
 			
 				Relation implementsRelation = Relation.find(database, Relation.IMPLEMENTS);
 				
@@ -250,7 +281,7 @@ public class Strategiakartta extends Base implements Serializable {
 					
 					Tavoite t = Tavoite.create(database, this, entry.getKey().getId(database), entry.getKey().getText(database));
 					for(Painopiste p : entry.getValue()) {
-						Painopiste p2 = Painopiste.create(database, this, t, p.getId(database) + " (" + database.getMap(p).getId(database) + ")", p.getText(database), null);
+						Painopiste p2 = Painopiste.create(main, this, t, p.getId(database) + " (" + database.getMap(p).getId(database) + ")", p.getText(database), null);
 						p2.meters.clear();
 						for(Meter m : p.getMeters(database))
 							p2.addMeter(m);
@@ -271,17 +302,113 @@ public class Strategiakartta extends Base implements Serializable {
 		
 	}
 	
+	static class CharacterInfo {
+		public String goalDescription;
+		public String focusDescription;
+		public String color;
+		public String textColor;
+		public boolean linkWithParent;
+		public boolean linkGoalsAndSubmaps;
+		public ObjectType goalSubmapType;
+		
+		public CharacterInfo getGoalSubmapInfo(Database database) {
+			if(goalSubmapType != null) {
+				CharacterInfo ci = Strategiakartta.getCharacterInfo(database, goalSubmapType);
+				if(ci.focusDescription.isEmpty()) {
+					ci.focusDescription = goalDescription;
+				}
+				return ci;
+			} else {
+				return null;
+			}
+		}
+		
+	}
+	
+	public static CharacterInfo getCharacterInfo(Database database, ObjectType mt) {
+
+		CharacterInfo result = new CharacterInfo();
+
+		Property characterColorP = Property.find(database, Property.CHARACTER_COLOR);
+		Property goalDescriptionP = Property.find(database, Property.GOAL_DESCRIPTION);
+		Property characterDescriptionP = Property.find(database, Property.CHARACTER_DESCRIPTION);
+		Property characterTextColorP = Property.find(database, Property.CHARACTER_TEXT_COLOR);
+		Property linkWithParentP = Property.find(database, Property.LINK_WITH_PARENT);
+		Property goalSubmapP = Property.find(database, Property.LINK_GOALS_AND_SUBMAPS);
+		Relation goalSubmapTypeR = Relation.find(database, Relation.TAVOITE_SUBMAP);
+		
+		result.color = characterColorP.getPropertyValue(mt);
+		if(result.color == null) result.color = "#034ea2";
+		result.goalDescription = goalDescriptionP.getPropertyValue(mt);
+		if(result.goalDescription == null) result.goalDescription = "";
+		result.focusDescription = characterDescriptionP.getPropertyValue(mt);
+		if(result.focusDescription == null) result.focusDescription = "";
+		result.textColor = characterTextColorP.getPropertyValue(mt);
+		result.linkWithParent = !"false".equals(linkWithParentP.getPropertyValue(mt));
+		result.linkGoalsAndSubmaps = "true".equals(goalSubmapP.getPropertyValue(mt));
+
+		Collection<Base> subTypes = mt.getRelatedObjects(database, goalSubmapTypeR);
+		if(subTypes.size() == 1) result.goalSubmapType = (ObjectType)subTypes.iterator().next();
+		
+		return result;
+		
+	}
+	
+	public ObjectType getLevelType(Database database) {
+		Property level = Property.find(database, Property.LEVEL);
+		String typeUUID = level.getPropertyValue(this);
+		if(typeUUID != null) {
+			return (ObjectType)database.find(typeUUID);
+		} else {
+			return null;
+		}
+	}
+	
+	public CharacterInfo getCharacterInfo(Database database) {
+		
+		Property level = Property.find(database, Property.LEVEL);
+		String typeUUID = level.getPropertyValue(this);
+		if(typeUUID != null) {
+			ObjectType mt = (ObjectType)database.find(typeUUID);
+			CharacterInfo ci = getCharacterInfo(database, mt);
+			if(ci.goalDescription.isEmpty()) {
+				Strategiakartta parent = getPossibleParent(database);
+				if(parent != null) {
+					CharacterInfo parentInfo = parent.getCharacterInfo(database);
+					ci.goalDescription = parentInfo.focusDescription;
+				}
+			}
+			return ci; 
+		} else {
+			CharacterInfo result = new CharacterInfo();
+			result.focusDescription = "Strateginen tavoite";
+			result.goalDescription = "";
+			result.color = "#034ea2";
+			result.textColor = "#fff";
+			result.linkWithParent = false;
+			result.linkGoalsAndSubmaps = false;
+			return result;
+		}
+		
+	}
+	
 	public void prepare(Main main) {
 		
 		Database database = main.getDatabase();
 		
 		for(Linkki l : alikartat) {
 			Strategiakartta k = database.find(l.uuid);
-			l.text = k.getText(database);
+			String text = k.getText(database);
+			if(text.isEmpty()) text = k.getId(database);
+			if(text.isEmpty()) text = "<anna teksti tai lyhytnimi kartalle>";
+			l.text = text;
 		}
 		for(Linkki l : parents) {
 			Strategiakartta k = database.find(l.uuid);
-			l.text = k.getText(database);
+			String text = k.getText(database);
+			if(text.isEmpty()) text = k.getId(database);
+			if(text.isEmpty()) text = "<anna teksti tai lyhytnimi kartalle>";
+			l.text = text;
 		}
 		for(Tavoite t : tavoitteet) {
 			t.synchronizeCopy(main);
@@ -295,34 +422,23 @@ public class Strategiakartta extends Base implements Serializable {
 
 		fixRows();
 		
-		Property level = Property.find(database, Property.LEVEL);
-		Property ownGoalType = Property.find(database, Property.OWN_GOAL_TYPE);
-		Property goalType = Property.find(database, Property.GOAL_TYPE);
-		Property focusType = Property.find(database, Property.FOCUS_TYPE);
-		Property characterColorP = Property.find(database, Property.CHARACTER_COLOR);
-		Property characterTextColorP = Property.find(database, Property.CHARACTER_TEXT_COLOR);
-		
-		String typeUUID = level.getPropertyValue(this);
-		if(typeUUID != null) {
-			ObjectType mt = (ObjectType)database.find(typeUUID);
-			Base tavoiteType = (Base)database.find(goalType.getPropertyValue(mt));
-			Base painopisteType = (Base)database.find(focusType.getPropertyValue(mt));
-			tavoiteDescription = tavoiteType.getText(database);
-			painopisteDescription = painopisteType.getText(database);
-			characterColor = characterColorP.getPropertyValue(mt);
-			if(characterColor == null) characterColor = "#CA6446";
-			tavoiteColor = characterColorP.getPropertyValue(tavoiteType);
-			tavoiteTextColor = characterTextColorP.getPropertyValue(tavoiteType);
-			painopisteColor = characterColorP.getPropertyValue(painopisteType);
+		CharacterInfo info = getCharacterInfo(database);
+		painopisteDescription = info.focusDescription;
+		painopisteColor = info.color;
+		painopisteTextColor = info.textColor;
+		linkWithParent = info.linkWithParent;
+		linkGoalsAndSubmaps = info.linkGoalsAndSubmaps;
 
-			String ownGoalUUID = ownGoalType.getPropertyValue(mt);
-			if(ownGoalUUID != null) {
-				Base ownGoal = (Base)database.find(ownGoalUUID);
-				ownGoalDescription = ownGoal.getText(database);
-			} else {
-				ownGoalDescription = tavoiteDescription;
-			}
-
+		Strategiakartta parent = getPossibleParent(database);
+		if(parent != null) {
+			CharacterInfo parentInfo = parent.getCharacterInfo(database);
+			tavoiteDescription = info.goalDescription.isEmpty() ? parentInfo.focusDescription : info.goalDescription;
+			tavoiteColor = parentInfo.color;
+			tavoiteTextColor = parentInfo.textColor;
+		} else {
+			tavoiteDescription = info.goalDescription.isEmpty() ? "Strateginen tavoite" : info.goalDescription;
+			tavoiteColor = "#034ea2";
+			tavoiteTextColor = "#fff";
 		}
 		
 	}
@@ -360,4 +476,44 @@ public class Strategiakartta extends Base implements Serializable {
 		}
 	}
 	
+	public Base currentLevel(Database database) {
+		Property levelProperty = Property.find(database, Property.LEVEL);
+		return levelProperty.getPropertyValueObject(database, this);
+	}
+	
+	public void setCurrentLevel(Main main, Base level) {
+		Property levelProperty = Property.find(main.getDatabase(), Property.LEVEL);
+		levelProperty.set(main, this, level.uuid);
+	}
+
+	public static Collection<Base> availableLevels(Database database) {
+        ObjectType levelType = ObjectType.find(database, ObjectType.LEVEL_TYPE);
+        return database.instances(levelType);
+	}
+
+	public boolean linkGoalsToSubmaps(Database database) {
+
+		Base level = currentLevel(database);
+		Property goalSubmapP = Property.find(database, Property.LINK_GOALS_AND_SUBMAPS);
+		String goalSubmapValue = goalSubmapP.getPropertyValue(level);
+		boolean tavoiteSubmap = false;
+		if("true".equals(goalSubmapValue)) tavoiteSubmap = true;
+		return tavoiteSubmap;
+
+	}
+	
+	public Base getPossibleSubmapType(Database database) throws Exception {
+		
+		Property levelProperty = Property.find(database, Property.LEVEL);
+		ObjectType level = database.find((String)levelProperty.getPropertyValue(this));
+
+		Relation goalSubmapTypeR = Relation.find(database, Relation.TAVOITE_SUBMAP);
+		Collection<Base> subTypes = level.getRelatedObjects(database, goalSubmapTypeR);
+		if(subTypes.size() == 1) return subTypes.iterator().next();
+		else if(subTypes.size() == 0) return null;
+		else throw new Exception("Multiple submap types.");
+		
+	}
+	
+
 }

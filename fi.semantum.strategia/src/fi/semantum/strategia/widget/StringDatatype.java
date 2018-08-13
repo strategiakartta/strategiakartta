@@ -31,6 +31,11 @@ public class StringDatatype extends Datatype {
 	}
 	
 	@Override
+	public Object getDefaultForecast() {
+		return "";
+	}
+	
+	@Override
 	public String format(Object value) {
 		return value.toString();
 	}

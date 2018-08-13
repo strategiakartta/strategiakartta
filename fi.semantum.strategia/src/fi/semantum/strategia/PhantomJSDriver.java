@@ -15,17 +15,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.EnumSet;
 
 import org.apache.commons.io.IOUtils;
 
 public class PhantomJSDriver {
 
-	public static String printHtml(String svgText) {
+	public static String printHtml(String svgText, String csspath) {
 
 		try {
-			File f = new File("WebContent/print.html");
+			File f = Main.getAppFile("print.html");
 			String template = new String(Files.readAllBytes(f.toPath()));
 			template = template.replace("%%svg", svgText);
+			template = template.replace("%%csspath", csspath);
 			return template;
 		} catch (IOException e) {
 			return null;
@@ -36,7 +40,7 @@ public class PhantomJSDriver {
 	public static String printCommand(String url, String outFile) {
 
 		try {
-			File f = new File("WebContent/print.js");
+			File f = Main.getAppFile("print.js");
 			String template = new String(Files.readAllBytes(f.toPath()));
 			template = template.replace("%%url", url);
 			template = template.replace("%%file", outFile.replace("\\", "/"));
@@ -47,12 +51,90 @@ public class PhantomJSDriver {
 		
 	}
 	
+	public enum ARCHType {
+	    X86, X86_64, UNKNOWN;
+
+	    public static ARCHType calculate() {
+	        String osArch = System.getProperty("os.arch");
+	        assert osArch != null;
+	        osArch = osArch.toLowerCase();
+	        if (osArch.equals("i386") || osArch.equals("i586") || osArch.equals("i686") || osArch.equals("x86"))
+	            return X86;
+	        if (osArch.startsWith("amd64") || osArch.startsWith("x86_64"))
+	            return X86_64;
+	        return UNKNOWN;
+	    }
+	}
+	
+	public enum OSType {
+	    LINUX, WINDOWS, UNKNOWN;
+
+	    public static OSType calculate() {
+	        String osName = System.getProperty("os.name");
+	        assert osName != null;
+	        osName = osName.toLowerCase();
+	        if (osName.startsWith("windows"))
+	            return WINDOWS;
+	        if (osName.startsWith("linux"))
+	            return LINUX;
+	        return UNKNOWN;
+	    }
+	}
+	
+	 public static String formOsArchSuffix() {
+	        String osName = System.getProperty("os.name");
+	        String osArch = System.getProperty("os.arch");
+	        OSType os = OSType.calculate();
+	        ARCHType arch = ARCHType.calculate();
+
+	        if (os == OSType.UNKNOWN)
+	            throw new UnsatisfiedLinkError("unknown OS '" + osName + "' cannot load native fastlz library");
+	        if (arch == ARCHType.UNKNOWN)
+	            throw new UnsatisfiedLinkError("unknown architecture '" + osArch + "' cannot load native fastlz library");
+
+	        String lib = "";
+	        switch (os) {
+	            case LINUX:
+	                lib += "-linux";
+	                switch (arch) {
+	                    case X86:
+	                        lib += "-x86";
+	                        break;
+	                    case X86_64:
+	                        lib += "-x86_64";
+	                        break;
+	                    default:
+	                        throw new UnsatisfiedLinkError("Unsupported architecture for Linux OS: " + osArch);
+	                }
+	                break;
+	            case WINDOWS:
+	                lib += "-windows";
+	                switch (arch) {
+	                    case X86:
+	                        lib += "-x86.exe";
+	                        break;
+	                    case X86_64:
+	                        lib += "-x86_64.exe";
+	                        break;
+	                    default:
+	                        throw new UnsatisfiedLinkError("Unsupported architecture for Windows: " + osArch);
+	                }
+	                break;
+	            default:
+	                throw new UnsatisfiedLinkError("Unsupported operating system: " + os);
+	        }
+	        return lib;
+	    }
+	 
 	public static boolean execute(File javascript) {
 		
 		try {
-		
-	        File filePath = new File("WebContent/phantomjs.exe");
 			
+			
+	        File filePath = Main.getAppFile("phantomjs" + formOsArchSuffix());
+
+			Files.setPosixFilePermissions(filePath.toPath(), EnumSet.of(PosixFilePermission.GROUP_EXECUTE, PosixFilePermission.OTHERS_EXECUTE, PosixFilePermission.OWNER_EXECUTE));
+
 			String[] args = { filePath.getAbsolutePath(),
 					javascript.getAbsolutePath()					
 			};

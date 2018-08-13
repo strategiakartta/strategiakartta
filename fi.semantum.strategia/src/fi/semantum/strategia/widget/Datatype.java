@@ -24,6 +24,7 @@ import com.vaadin.ui.TextField;
 
 import fi.semantum.strategia.Main;
 import fi.semantum.strategia.Utils.AbstractCommentCallback;
+import fi.semantum.strategia.Utils.CommentCallback;
 
 abstract public class Datatype extends Base {
 
@@ -66,9 +67,9 @@ abstract public class Datatype extends Base {
 	
 	public abstract TrafficValuation getDefaultTrafficValuation();
 	
-	public AbstractField<?> getEditor(final Main main, final Base base, final Indicator indicator) {
+	public AbstractField<?> getEditor(final Main main, final Base base, final Indicator indicator, final boolean forecast, final CommentCallback callback) {
 		
-		Object value = indicator.getValue();
+		Object value = forecast ? indicator.getForecast() : indicator.getValue();
 		final String formatted = indicator.getDatatype(main.getDatabase()).format(value);
 
 		final TextField tf = new TextField();
@@ -101,10 +102,15 @@ abstract public class Datatype extends Base {
 					
 					try {
 						final BigDecimal number = BigDecimal.valueOf(Double.parseDouble(tf.getValue()));
-						indicator.modifyValueWithComment(main, base, number, new AbstractCommentCallback() {
+						indicator.updateWithComment(main, base, number, forecast, new AbstractCommentCallback() {
 							
 							public void canceled() {
 								tf.setValue(formatted);
+								if(callback != null) callback.canceled();
+							}
+							
+							public void runWithComment(String shortComment, String comment) {
+								if(callback != null) callback.runWithComment(shortComment, comment);
 							}
 							
 						});
@@ -127,6 +133,7 @@ abstract public class Datatype extends Base {
 	}
 	
 	abstract public Object getDefaultValue();
+	abstract public Object getDefaultForecast();
 	
 	abstract public String format(Object value);
 	

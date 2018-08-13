@@ -78,7 +78,7 @@ page.open('%%url', function (status) {
 				
 	});
 
-	page.render('printing/%%file', {quality: '100'});
+	page.render('%%file', {quality: '100'});
 
 	progress('#rendered');
 	

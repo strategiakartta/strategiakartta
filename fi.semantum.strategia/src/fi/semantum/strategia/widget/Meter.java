@@ -25,8 +25,8 @@ import com.vaadin.event.LayoutEvents.LayoutClickEvent;
 import com.vaadin.event.LayoutEvents.LayoutClickListener;
 import com.vaadin.event.MouseEvents;
 import com.vaadin.server.Page;
-import com.vaadin.server.ThemeResource;
 import com.vaadin.server.Page.Styles;
+import com.vaadin.server.ThemeResource;
 import com.vaadin.shared.ui.label.ContentMode;
 import com.vaadin.ui.AbsoluteLayout;
 import com.vaadin.ui.AbstractComponent;
@@ -34,6 +34,7 @@ import com.vaadin.ui.AbstractField;
 import com.vaadin.ui.Alignment;
 import com.vaadin.ui.Button;
 import com.vaadin.ui.Button.ClickEvent;
+import com.vaadin.ui.Button.ClickListener;
 import com.vaadin.ui.ComboBox;
 import com.vaadin.ui.Component;
 import com.vaadin.ui.HorizontalLayout;
@@ -44,11 +45,14 @@ import com.vaadin.ui.Table;
 import com.vaadin.ui.TextArea;
 import com.vaadin.ui.TextField;
 import com.vaadin.ui.VerticalLayout;
+import com.vaadin.ui.Window;
 import com.vaadin.ui.themes.ValoTheme;
 
+import fi.semantum.strategia.Dialogs;
 import fi.semantum.strategia.Main;
 import fi.semantum.strategia.Updates;
 import fi.semantum.strategia.Utils;
+import fi.semantum.strategia.Wiki;
 
 public class Meter extends Base {
 
@@ -64,7 +68,22 @@ public class Meter extends Base {
 	private boolean userDefined = false;
 	
 	private boolean showInMap = true;
+	public boolean isPrincipal = false;
+	
+	public String link = "";
+	//public String description = "";
+	
+	private boolean isTransient = false;
 
+	public static Meter transientMeter(String id, String link, double value) {
+		Meter result = new Meter(id, "", new ContinuousTrafficValuation());
+		result.userDefined = true;
+		result.userValue = value;
+		result.link = link;
+		result.isTransient = true;
+		return result;
+	}
+	
 	public static Meter create(Database database, String id, String text,
 			TrafficValuation trafficValuation) {
 		Meter p = new Meter(id, text, trafficValuation);
@@ -83,6 +102,10 @@ public class Meter extends Base {
 		super(UUID.randomUUID().toString(), id, text);
 		this.trafficValuation = valuation;
 		limits = null;
+	}
+	
+	public boolean isTransient() {
+		return isTransient;
 	}
 
 	@Override
@@ -165,11 +188,11 @@ public class Meter extends Base {
 
 	}
 	
-	public String describe(Database database) {
+	public String describe(Database database, boolean forecast) {
 
 		Indicator i = getPossibleIndicator(database);
 		if(i != null) {
-			Object value = i.getValue();
+			Object value = i.getValue(forecast);
 			if(value == null) return "arvoa ei ole annettu";
 			Datatype datatype = i.getDatatype(database);
 			return datatype.format(value) + " " + i.getUnit();
@@ -196,12 +219,16 @@ public class Meter extends Base {
 	}
 
 	public double value(Database database) {
+		return value(database, true);
+	}
+
+	public double value(Database database, boolean forecast) {
 
 		if(userDefined) return userValue;
 
 		Indicator indicator = getPossibleIndicator(database);
 		if(indicator != null) {
-			String color = getTrafficColor(database);
+			String color = getTrafficColor(database, forecast);
 			if(TrafficValuation.GREEN.equals(color)) return 1.0;
 			else if(TrafficValuation.YELLOW.equals(color)) return 0.5;
 			else return 0.0;
@@ -213,7 +240,7 @@ public class Meter extends Base {
 		if(submeters.isEmpty()) return 0.0;
 		
 		for (Meter m : submeters) {
-			result += m.value(database);
+			result += m.value(database, forecast);
 			contributions++;
 		}
 		
@@ -292,11 +319,15 @@ public class Meter extends Base {
 	}
 
 	public String getTrafficColor(Database database) {
+		return getTrafficColor(database, true);
+	}
+
+	public String getTrafficColor(Database database, boolean forecast) {
 		
 		Indicator indicator = getPossibleIndicator(database);
 		if(indicator != null) {
-
-			Object value = indicator.getValue();
+			
+			Object value = indicator.getValue(forecast);
 			if(value == null) return TrafficValuation.RED;
 			
 			String s = trafficValuation.getTrafficValue(value);
@@ -306,14 +337,14 @@ public class Meter extends Base {
 			
 		}
 		
-		return trafficColor(value(database));
+		return Utils.trafficColor(value(database, forecast));
 
 	}
 
 	@Override
 	public boolean migrate(Main main) {
 		
-		boolean result = true;
+		boolean result = false;
 		
 		Database database = main.getDatabase();
 		
@@ -367,7 +398,7 @@ public class Meter extends Base {
 		
 	}
 
-	public static void addIndicatorMeter(Main main, Base b, Indicator indicator, String year) {
+	public static Meter addIndicatorMeter(Main main, Base b, Indicator indicator, String year) {
 
 		Database database = main.getDatabase();
 		Relation measures = Relation.find(database, Relation.MEASURES);
@@ -379,6 +410,8 @@ public class Meter extends Base {
 		m.addRelation(measures, indicator);
 		
 		Utils.modifyValidity(main, m, year);
+		
+		return m;
 		
 	}
 
@@ -401,7 +434,7 @@ public class Meter extends Base {
 				EnumerationDatatype enu = (EnumerationDatatype)datatype;
 				
 				Object value = i.getValue();
-				AbstractField<?> combo = enu.getEditor(main, base, i);
+				AbstractField<?> combo = enu.getEditor(main, base, i, false, null);
 				
 				hl2.addComponent(combo);
 				hl2.setComponentAlignment(combo, Alignment.MIDDLE_CENTER);
@@ -412,7 +445,7 @@ public class Meter extends Base {
 			
 		}
 
-		final Label label = new Label(meter.describe(database));
+		final Label label = new Label(meter.describe(database, main.getUIState().forecastMeters));
 		label.setWidthUndefined();
 
 		hl2.addComponent(label);
@@ -429,7 +462,7 @@ public class Meter extends Base {
 
 		final Database database = main.getDatabase();
 		
-		Base base = main.getUIState().currentItem;
+		final Base base = main.getUIState().currentItem;
 		
 		List<MeterDescription> descs = makeMeterDescriptions(main, base, false);
 		if(!descs.isEmpty() || canWrite) {
@@ -481,12 +514,11 @@ public class Meter extends Base {
 				
 				ArrayList<String> excelRow = new ArrayList<String>();
 
-				Meter meter = desc.meter;
+				final Meter meter = desc.meter;
 
 				final HorizontalLayout hl = new HorizontalLayout();
 				hl.addStyleName((((index++)&1) == 0) ? "evenProperty" : "oddProperty");
 				hl.setSpacing(true);
-				hl.setHeight("42px");
 				
 				Label l = new Label(desc.caption);
 				excelRow.add(l.getValue().replace("%nbsp",""));
@@ -582,7 +614,7 @@ public class Meter extends Base {
 
 					@Override
 					public void click(com.vaadin.event.MouseEvents.ClickEvent event) {
-						Utils.openWiki(main, desc.meter);
+						Wiki.openWiki(main, desc.meter);
 					}
 
 				});
@@ -590,6 +622,36 @@ public class Meter extends Base {
 				hl.addComponent(wiki);
 				hl.setComponentAlignment(wiki, Alignment.MIDDLE_CENTER);
 
+				
+				if(canWrite) {
+					final Button principalButton = new Button();
+					if(meter.isPrincipal) {
+						principalButton.setCaption("Poista kokonaisarvio");
+					} else {
+						principalButton.setCaption("Aseta kokonaisarvioksi");
+					}
+					principalButton.setStyleName(ValoTheme.BUTTON_TINY);
+					principalButton.addClickListener(new ClickListener() {
+
+						private static final long serialVersionUID = 8247560202892661226L;
+
+						@Override
+						public void buttonClick(ClickEvent event) {
+							if(meter.isPrincipal) {
+								meter.isPrincipal = false;
+							} else {
+								for(Meter m : base.getMeters(database)) m.isPrincipal = false;
+								meter.isPrincipal = true;
+							}
+							Updates.update(main, true);
+							
+						}
+
+					});
+					hl.addComponent(principalButton);
+					hl.setComponentAlignment(principalButton, Alignment.MIDDLE_CENTER);
+				}
+				
 				main.propertyCells.add(excelRow);
 
 			}
@@ -802,7 +864,8 @@ public class Meter extends Base {
 				
 				for(Meter r : getSelection()) {
 					Base owner = r.getOwner(database);
-					owner.removeMeter(r);
+					if(owner != null)
+						owner.removeMeter(r);
 				}
 				
 				makeMeterTable(main, base, table);
@@ -819,7 +882,10 @@ public class Meter extends Base {
 
 			public void buttonClick(ClickEvent event) {
 
-				for(Map.Entry<Base, List<Meter>> entry : getSelectionByParent(database).entrySet()) {
+				Map<Base,List<Meter>> sel = getSelectionByParent(database);
+				if(sel == null) return;
+				
+				for(Map.Entry<Base, List<Meter>> entry : sel.entrySet()) {
 					entry.getKey().moveMetersUp(entry.getValue());
 				}
 				
@@ -910,7 +976,8 @@ public class Meter extends Base {
 				} else if (source instanceof EnumerationDatatype) {
 					EnumerationDatatype dt = (EnumerationDatatype)source;
 					Indicator ind = Indicator.create(database, "Uusi " + dt.getId(database), dt);
-					ind.modifyValue(main, base, dt.getDefaultValue(), "", "Alkuarvo");
+					ind.update(main, base, dt.getDefaultValue(), false, "", "Alkuarvo");
+					ind.update(main, base, dt.getDefaultForecast(), true, "", "Alkuarvo");
 					Meter.addIndicatorMeter(main, base, ind, Property.AIKAVALI_KAIKKI);
 				}
 				
@@ -939,7 +1006,8 @@ public class Meter extends Base {
 				} else if (source instanceof EnumerationDatatype) {
 					EnumerationDatatype dt = (EnumerationDatatype)source;
 					Indicator ind = Indicator.create(database, "Uusi " + dt.getId(database), dt);
-					ind.modifyValue(main, base, dt.getDefaultValue(), "", "Alkuarvo");
+					ind.update(main, base, dt.getDefaultValue(), false, "", "Alkuarvo");
+					ind.update(main, base, dt.getDefaultForecast(), true, "", "Alkuarvo");
 					Meter.addIndicatorMeter(main, meter, ind, Property.AIKAVALI_KAIKKI);
 				}
 				
@@ -1042,7 +1110,7 @@ public class Meter extends Base {
         buttons.setSpacing(true);
         buttons.setMargin(false);
         
-		Utils.makeDialog(main, "450px", "800px", "Hallitse mittareita", "Sulje", content, buttons);
+        final Window dialog = Dialogs.makeDialog(main, "450px", "600px", "Hallitse mittareita", "Sulje", content, buttons);
 
 	}
 
@@ -1110,7 +1178,7 @@ public class Meter extends Base {
 
         Indicator indicator = meter.getPossibleIndicator(database);
         if(indicator != null) {
-	        final Label ta2 = Indicator.makeHistory(database, indicator);     
+	        final Label ta2 = Indicator.makeHistory(database, indicator, main.getUIState().forecastMeters);     
 			content.addComponent(ta2);
 	        content.setComponentAlignment(ta2, Alignment.MIDDLE_CENTER);
 	        content.setExpandRatio(ta2, 1.0f);
@@ -1137,19 +1205,20 @@ public class Meter extends Base {
         });
         buttons.addComponent(ok);
 
-        Button close = new Button("Sulje", new Button.ClickListener() {
+        Button close = new Button("Sulje");
+        buttons.addComponent(close);
+        
+        final Window dialog = Dialogs.makeDialog(main, "500px", "800px", "M‰‰rit‰ mittaria", null, content, buttons);
+        close.addClickListener(new Button.ClickListener() {
         	
 			private static final long serialVersionUID = -8065367213523520602L;
 
 			public void buttonClick(ClickEvent event) {
-    			main.closeDialog();
+    			main.removeWindow(dialog);
 				manageMeters(main, main.getUIState().currentItem);
             }
             
         });
-        buttons.addComponent(close);
-        
-		Utils.makeDialog(main, "500px", "800px", "M‰‰rit‰ mittaria", null, content, buttons);
 
 	}
 	
@@ -1160,5 +1229,34 @@ public class Meter extends Base {
 	public String trafficValuationDescription(){
 		return trafficValuation.toString();
 	}
-	
+
+	@Override
+	public String getDescription(Database database) {
+		return getDescription(database, true);
+	}
+
+	public String getDescription(Database database, boolean forecast) {
+		Indicator indicator = getPossibleIndicator(database);
+		if(indicator != null) {
+			double value = value(database, forecast);
+			return "" + (int)(100.0*value) + "%";
+		}
+		return super.getDescription(database);
+	}
+
+	public String getVerboseDescription(Database database, boolean forecast) {
+		Indicator indicator = getPossibleIndicator(database);
+		if(indicator != null) {
+			String result = indicator.getValueShortComment();
+			if(result == null || result.isEmpty()) {
+       			double value = value(database, forecast);
+       			return "" + (int)(100.0*value) + "%";
+			}
+			else return result;
+		} else if (description != null && !description.isEmpty()) {
+			return description;
+		}
+		return super.getDescription(database);
+	}
+
 }

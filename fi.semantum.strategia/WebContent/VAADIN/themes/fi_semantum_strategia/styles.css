@@ -1,3 +1,14 @@
+/*******************************************************************************
+ * Copyright (c) 2014 Ministry of Transport and Communications (Finland).
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * which accompanies this distribution, and is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ *
+ * Contributors:
+ *     Semantum Oy - initial API and implementation
+ *******************************************************************************/
+
 /**
  * Checks if a list contains a certain value.
  * 
@@ -314,6 +325,24 @@
  * 
  * @group util
  */
+
+@font-face {
+	font-family: ThemeIcons;
+	font-weight: normal;
+	font-style: normal;
+	src: url(../valo/util/bourbon/css3/../../../../base/fonts/themeicons-webfont.eot);
+	src: url(../valo/util/bourbon/css3/../../../../base/fonts/themeicons-webfont.eot?#iefix) format("embedded-opentype"), url(../valo/util/bourbon/css3/../../../../base/fonts/themeicons-webfont.woff) format("woff"), url(../valo/util/bourbon/css3/../../../../base/fonts/themeicons-webfont.ttf) format("truetype"), url(../valo/util/bourbon/css3/../../../../base/fonts/themeicons-webfont.svg#ThemeIcons) format("svg");
+}
+
+.ThemeIcons {
+	font-family: ThemeIcons;
+	font-style: normal;
+	font-weight: normal;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	display: inline-block;
+	text-align: center;
+}
 
 @font-face {
 	font-family: FontAwesome;
@@ -981,7 +1010,7 @@
  */
 
 .v-vaadin-version:after {
-	content: "7.5.10";
+	content: "7.6.0";
 }
 
 .v-widget {
@@ -1860,6 +1889,60 @@ div.v-layout.v-horizontal.v-widget {
 	text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.05);
 }
 
+.fi_semantum_strategia .v-reconnect-dialog {
+	color: white;
+	top: 12px;
+	right: 12px;
+	max-width: 100%;
+	border-radius: 0;
+	-webkit-box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.25);
+	box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.25);
+	padding: 12px 15px;
+	background-color: #444;
+	background-color: rgba(68, 68, 68, 0.9);
+	line-height: 22px;
+	text-align: center;
+}
+
+.fi_semantum_strategia .v-reconnect-dialog .text {
+	display: inline-block;
+	padding-left: 10px;
+}
+
+.fi_semantum_strategia .v-reconnect-dialog .spinner {
+	height: 24px !important;
+	width: 24px !important;
+	-webkit-box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	box-sizing: border-box;
+	border: 2px solid rgba(25, 125, 225, 0.2);
+	border-top-color: #197de1;
+	border-right-color: #197de1;
+	border-radius: 100%;
+	-webkit-animation: v-rotate-360 500ms infinite linear;
+	-moz-animation: v-rotate-360 500ms infinite linear;
+	animation: v-rotate-360 500ms infinite linear;
+	pointer-events: none;
+	display: none;
+	vertical-align: middle;
+}
+
+.v-ie8 .fi_semantum_strategia .v-reconnect-dialog .spinner, .v-ie9 .fi_semantum_strategia .v-reconnect-dialog .spinner {
+	border: none;
+	border-radius: 4px;
+	background: #fff url(../valo/shared/img/spinner.gif) no-repeat 50% 50%;
+	background-size: 80%;
+}
+
+.v-ie8 .fi_semantum_strategia .v-reconnect-dialog .spinner {
+	min-width: 30px;
+	min-height: 30px;
+}
+
+.fi_semantum_strategia .v-reconnect-dialog.active .spinner {
+	display: inline-block;
+}
+
 .fi_semantum_strategia .v-absolutelayout-wrapper {
 	position: absolute;
 }
@@ -2504,7 +2587,7 @@ div.v-layout.v-horizontal.v-widget {
 
 :root .fi_semantum_strategia .v-checkbox > input ~ label:after {
 	content: "\f00c";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	color: transparent;
 	-webkit-transition: color 100ms;
 	-moz-transition: color 100ms;
@@ -2634,7 +2717,7 @@ div.v-layout.v-horizontal.v-widget {
 
 :root .fi_semantum_strategia .v-checkbox-small > input ~ label:after {
 	content: "\f00c";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	color: transparent;
 	-webkit-transition: color 100ms;
 	-moz-transition: color 100ms;
@@ -2764,7 +2847,7 @@ div.v-layout.v-horizontal.v-widget {
 
 :root .fi_semantum_strategia .v-checkbox-large > input ~ label:after {
 	content: "\f00c";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	color: transparent;
 	-webkit-transition: color 100ms;
 	-moz-transition: color 100ms;
@@ -2855,7 +2938,7 @@ div.v-layout.v-horizontal.v-widget {
 	transition: box-shadow 180ms, border 180ms;
 	width: 100% !important;
 	height: 100%;
-	padding-right: 44px;
+	padding-right: 38px;
 	border-radius: inherit;
 }
 
@@ -2925,7 +3008,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-filterselect [class$="button"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f078";
 	-webkit-transition: color 140ms;
 	-moz-transition: color 140ms;
@@ -3118,7 +3201,7 @@ div.v-layout.v-horizontal.v-widget {
 	height: 25px;
 	line-height: 25px;
 	text-align: center;
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	-webkit-transform: scale(0.8);
 	-moz-transform: scale(0.8);
 	-ms-transform: scale(0.8);
@@ -3310,7 +3393,7 @@ div.v-layout.v-horizontal.v-widget {
 	transition: box-shadow 180ms, border 180ms;
 	width: 100% !important;
 	height: 100%;
-	padding-right: 34px;
+	padding-right: 29px;
 	border-radius: inherit;
 }
 
@@ -3346,7 +3429,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-filterselect-tiny [class$="button"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f078";
 	-webkit-transition: color 140ms;
 	-moz-transition: color 140ms;
@@ -3437,7 +3520,7 @@ div.v-layout.v-horizontal.v-widget {
 	transition: box-shadow 180ms, border 180ms;
 	width: 100% !important;
 	height: 100%;
-	padding-right: 37px;
+	padding-right: 32px;
 	border-radius: inherit;
 }
 
@@ -3473,7 +3556,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-filterselect-compact [class$="button"]:before, .fi_semantum_strategia .v-filterselect-small [class$="button"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f078";
 	-webkit-transition: color 140ms;
 	-moz-transition: color 140ms;
@@ -3569,7 +3652,7 @@ div.v-layout.v-horizontal.v-widget {
 	transition: box-shadow 180ms, border 180ms;
 	width: 100% !important;
 	height: 100%;
-	padding-right: 53px;
+	padding-right: 45px;
 	border-radius: inherit;
 }
 
@@ -3605,7 +3688,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-filterselect-large [class$="button"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f078";
 	-webkit-transition: color 140ms;
 	-moz-transition: color 140ms;
@@ -3697,7 +3780,7 @@ div.v-layout.v-horizontal.v-widget {
 	transition: box-shadow 180ms, border 180ms;
 	width: 100% !important;
 	height: 100%;
-	padding-right: 71px;
+	padding-right: 60px;
 	border-radius: inherit;
 }
 
@@ -3733,7 +3816,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-filterselect-huge [class$="button"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f078";
 	-webkit-transition: color 140ms;
 	-moz-transition: color 140ms;
@@ -4297,6 +4380,10 @@ div.v-layout.v-horizontal.v-widget {
 	z-index: 5;
 }
 
+.fi_semantum_strategia .v-grid-sidebar.v-contextmenu.v-grid-sidebar-popup {
+	right: auto;
+}
+
 .fi_semantum_strategia .v-grid-sidebar.v-contextmenu .v-grid-sidebar-button {
 	background: transparent;
 	border: none;
@@ -4319,7 +4406,7 @@ div.v-layout.v-horizontal.v-widget {
 .fi_semantum_strategia .v-grid-sidebar.v-contextmenu .v-grid-sidebar-button:after {
 	content: "\f0c9";
 	display: block;
-	font-family: FontAwesome, sans-serif;
+	font-family: ThemeIcons, sans-serif;
 	font-size: 14px;
 }
 
@@ -4357,7 +4444,7 @@ div.v-layout.v-horizontal.v-widget {
 
 .fi_semantum_strategia .v-grid-cell {
 	background-color: white;
-	padding: 0 12px;
+	padding: 0 18px;
 	line-height: 37px;
 	text-overflow: ellipsis;
 }
@@ -4425,19 +4512,37 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-grid-header .sort-asc, .fi_semantum_strategia .v-grid-header .sort-desc {
-	padding-right: 29px;
+	padding-right: 35px;
 }
 
 .fi_semantum_strategia .v-grid-header .sort-asc:after, .fi_semantum_strategia .v-grid-header .sort-desc:after {
-	font-family: FontAwesome, sans-serif;
+	font-family: ThemeIcons, sans-serif;
 	content: "\f0de" " " attr(sort-order);
 	position: absolute;
-	right: 12px;
+	right: 18px;
 	font-size: 12px;
 }
 
 .fi_semantum_strategia .v-grid-header .sort-desc:after {
 	content: "\f0dd" " " attr(sort-order);
+}
+
+.fi_semantum_strategia .v-grid-column-resize-handle {
+	position: absolute;
+	width: 36px;
+	top: 0px;
+	bottom: 0px;
+	cursor: col-resize;
+	z-index: 10;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+.fi_semantum_strategia .sort-asc  > .v-grid-column-resize-handle, .fi_semantum_strategia .sort-desc  > .v-grid-column-resize-handle {
+	right: -18px;
 }
 
 .fi_semantum_strategia .v-grid-footer td {
@@ -4452,6 +4557,18 @@ div.v-layout.v-horizontal.v-widget {
 
 .fi_semantum_strategia .v-grid-footer td:first-child {
 	border-left: none;
+}
+
+.fi_semantum_strategia .v-grid-header .v-grid-cell, .fi_semantum_strategia .v-grid-footer .v-grid-cell {
+	overflow: visible;
+}
+
+.fi_semantum_strategia .v-grid-column-header-content, .fi_semantum_strategia .v-grid-column-footer-content {
+	width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	line-height: 37px;
+	vertical-align: baseline;
 }
 
 .fi_semantum_strategia .v-grid-header-deco {
@@ -4514,6 +4631,10 @@ div.v-layout.v-horizontal.v-widget {
 	box-shadow: 0 0 9px rgba(0, 0, 0, 0.2);
 }
 
+.fi_semantum_strategia .v-grid-editor.unbuffered .v-grid-editor-footer {
+	width: 100%;
+}
+
 .fi_semantum_strategia .v-grid-editor-cells {
 	position: relative;
 	white-space: nowrap;
@@ -4541,6 +4662,22 @@ div.v-layout.v-horizontal.v-widget {
 	display: inline-block;
 }
 
+.fi_semantum_strategia .v-grid-editor-cells  > div .v-filterselect {
+	padding-left: 0;
+}
+
+.fi_semantum_strategia .v-grid-editor-cells  > div input[type="text"], .fi_semantum_strategia .v-grid-editor-cells  > div input[type="text"].v-filterselect-input, .fi_semantum_strategia .v-grid-editor-cells  > div input[type="password"] {
+	padding-left: 18px;
+}
+
+.fi_semantum_strategia .v-grid-editor-cells  > div input[type="text"]:not(.v-filterselect-input), .fi_semantum_strategia .v-grid-editor-cells  > div input[type="password"] {
+	padding-right: 9px;
+}
+
+.fi_semantum_strategia .v-grid-editor-cells  > div input[type="checkbox"] {
+	margin-left: 18px;
+}
+
 .fi_semantum_strategia .v-grid-editor-cells  > div .v-textfield, .fi_semantum_strategia .v-grid-editor-cells  > div .v-datefield, .fi_semantum_strategia .v-grid-editor-cells  > div .v-filterselect {
 	min-width: 100%;
 	max-width: 100%;
@@ -4559,6 +4696,10 @@ div.v-layout.v-horizontal.v-widget {
 .fi_semantum_strategia .v-grid-editor-cells  > div .v-select, .fi_semantum_strategia .v-grid-editor-cells  > div .v-select-select {
 	min-width: 100%;
 	max-width: 100%;
+}
+
+.fi_semantum_strategia .v-grid-editor-cells  > div.not-editable.v-grid-cell {
+	float: none;
 }
 
 .fi_semantum_strategia .v-grid-editor-cells .error::before {
@@ -4759,6 +4900,10 @@ div.v-layout.v-horizontal.v-widget {
 	vertical-align: middle;
 }
 
+.fi_semantum_strategia .v-grid-editor-cells > div.not-editable.v-grid-cell {
+	float: none;
+}
+
 .fi_semantum_strategia .v-grid-editor-cells > div .error::before {
 	border-top: 9px solid #ed473b;
 	border-right: 9px solid transparent;
@@ -4776,6 +4921,10 @@ div.v-layout.v-horizontal.v-widget {
 	box-shadow: inset 0 1px 0 #f2f2f2;
 }
 
+.fi_semantum_strategia .v-grid-editor-cells > div input[type="text"].v-datefield-textfield {
+	padding-left: 44.4px;
+}
+
 .v-ie8 .fi_semantum_strategia .v-grid-editor-cells > div .v-datefield-button {
 	margin-left: 0px;
 }
@@ -4789,15 +4938,19 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-grid-editor-cells > div .v-select {
-	padding-left: 6px;
-	padding-right: 6px;
+	padding-left: 9px;
+	padding-right: 9px;
 }
 
 .fi_semantum_strategia .v-grid-editor-cells > div .v-checkbox {
-	margin: 0 6px;
+	margin: 0 9px 0 18px;
 }
 
-.fi_semantum_strategia .v-grid-editor-cells > div .v-checkbox label {
+.fi_semantum_strategia .v-grid-editor-cells > div .v-checkbox  > input[type="checkbox"] {
+	margin-left: 0;
+}
+
+.fi_semantum_strategia .v-grid-editor-cells > div .v-checkbox  > label {
 	white-space: nowrap;
 }
 
@@ -5719,7 +5872,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-datefield [class*="button"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f073";
 	-webkit-transition: color 140ms;
 	-moz-transition: color 140ms;
@@ -5967,22 +6120,22 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-datefield-popup .v-button-prevyear:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f100";
 }
 
 .fi_semantum_strategia .v-datefield-popup .v-button-prevmonth:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f104";
 }
 
 .fi_semantum_strategia .v-datefield-popup .v-button-nextyear:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f101";
 }
 
 .fi_semantum_strategia .v-datefield-popup .v-button-nextmonth:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f105";
 }
 
@@ -6160,22 +6313,22 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-button-prevyear:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f100";
 }
 
 .fi_semantum_strategia .v-button-prevmonth:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f104";
 }
 
 .fi_semantum_strategia .v-button-nextyear:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f101";
 }
 
 .fi_semantum_strategia .v-button-nextmonth:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f105";
 }
 
@@ -6324,7 +6477,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-datefield-tiny [class*="button"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f073";
 	-webkit-transition: color 140ms;
 	-moz-transition: color 140ms;
@@ -6439,7 +6592,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-datefield-compact [class*="button"]:before, .fi_semantum_strategia .v-datefield-small [class*="button"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f073";
 	-webkit-transition: color 140ms;
 	-moz-transition: color 140ms;
@@ -6559,7 +6712,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-datefield-large [class*="button"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f073";
 	-webkit-transition: color 140ms;
 	-moz-transition: color 140ms;
@@ -6675,7 +6828,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-datefield-huge [class*="button"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f073";
 	-webkit-transition: color 140ms;
 	-moz-transition: color 140ms;
@@ -6855,22 +7008,22 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-button-prevyear:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f100";
 }
 
 .fi_semantum_strategia .v-button-prevmonth:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f104";
 }
 
 .fi_semantum_strategia .v-button-nextyear:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f101";
 }
 
 .fi_semantum_strategia .v-button-nextmonth:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f105";
 }
 
@@ -7166,7 +7319,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-menubar .v-menubar-submenu-indicator  + .v-menubar-menuitem-caption:after {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f078";
 	font-size: 0.7em;
 	vertical-align: 0.15em;
@@ -7250,7 +7403,7 @@ div.v-layout.v-horizontal.v-widget {
 .fi_semantum_strategia .v-menubar-popup .v-menubar-submenu-indicator  + .v-menubar-menuitem-caption:after {
 	position: absolute;
 	right: 10px;
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f054";
 	line-height: 29px;
 }
@@ -7273,7 +7426,7 @@ div.v-layout.v-horizontal.v-widget {
 
 .fi_semantum_strategia .v-menubar-popup [class*="checked"] .v-menubar-menuitem-caption:before {
 	content: "\f00c";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	position: absolute;
 	left: 10px;
 }
@@ -7460,7 +7613,7 @@ div.v-layout.v-horizontal.v-widget {
 
 :root .fi_semantum_strategia .v-radiobutton > input ~ label:after {
 	content: "\f00c";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	color: transparent;
 	-webkit-transition: color 100ms;
 	-moz-transition: color 100ms;
@@ -7623,7 +7776,7 @@ div.v-layout.v-horizontal.v-widget {
 
 :root .fi_semantum_strategia .v-select-optiongroup-small .v-checkbox > input ~ label:after {
 	content: "\f00c";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	color: transparent;
 	-webkit-transition: color 100ms;
 	-moz-transition: color 100ms;
@@ -7752,7 +7905,7 @@ div.v-layout.v-horizontal.v-widget {
 
 :root .fi_semantum_strategia .v-select-optiongroup-small .v-radiobutton > input ~ label:after {
 	content: "\f00c";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	color: transparent;
 	-webkit-transition: color 100ms;
 	-moz-transition: color 100ms;
@@ -7915,7 +8068,7 @@ div.v-layout.v-horizontal.v-widget {
 
 :root .fi_semantum_strategia .v-select-optiongroup-large .v-checkbox > input ~ label:after {
 	content: "\f00c";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	color: transparent;
 	-webkit-transition: color 100ms;
 	-moz-transition: color 100ms;
@@ -8044,7 +8197,7 @@ div.v-layout.v-horizontal.v-widget {
 
 :root .fi_semantum_strategia .v-select-optiongroup-large .v-radiobutton > input ~ label:after {
 	content: "\f00c";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	color: transparent;
 	-webkit-transition: color 100ms;
 	-moz-transition: color 100ms;
@@ -8567,7 +8720,7 @@ div.v-layout.v-horizontal.v-widget {
 	margin-left: -1.9em;
 	vertical-align: top;
 	content: "\f0da";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	text-align: center;
 	background: transparent;
 }
@@ -8593,7 +8746,7 @@ div.v-layout.v-horizontal.v-widget {
 
 .fi_semantum_strategia .v-tree-node-caption > div:before {
 	content: "\f0da";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	display: inline-block;
 	width: 0.5em;
 	text-align: center;
@@ -8656,12 +8809,12 @@ div.v-layout.v-horizontal.v-widget {
 	-o-transform: rotate(90deg);
 	transform: rotate(90deg);
 	content: "\f0da";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 }
 
 .v-ie8 .fi_semantum_strategia .v-tree-node-expanded:before {
 	content: "\f0d7";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 }
 
 .fi_semantum_strategia .v-tree-node-leaf:before, .fi_semantum_strategia .v-tree-node-leaf > .v-tree-node-caption > div:before {
@@ -8879,7 +9032,7 @@ div.v-layout.v-horizontal.v-widget {
 	border-top: 1px solid #d4d4d4;
 }
 
-.fi_semantum_strategia .v-table-table tr:first-child td {
+.fi_semantum_strategia .v-table-table tr:first-child > td {
 	border-top: none;
 }
 
@@ -8939,12 +9092,12 @@ div.v-layout.v-horizontal.v-widget {
 
 .fi_semantum_strategia .v-table-header-cell-asc .v-table-sort-indicator:before {
 	content: "\f0de";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 }
 
 .fi_semantum_strategia .v-table-header-cell-desc .v-table-sort-indicator:before {
 	content: "\f0dd";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 }
 
 .fi_semantum_strategia [class*="rowheader"] span.v-icon {
@@ -9058,7 +9211,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-table-column-selector:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f013";
 }
 
@@ -9072,7 +9225,7 @@ div.v-layout.v-horizontal.v-widget {
 
 .fi_semantum_strategia .v-on:before, .fi_semantum_strategia .v-off:before {
 	content: "\f00c";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	font-size: 0.9em;
 	margin-right: 6px;
 }
@@ -9336,12 +9489,12 @@ div.v-layout.v-horizontal.v-widget {
 
 .fi_semantum_strategia .v-treetable-node-closed:before {
 	content: "\f0da";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 }
 
 .fi_semantum_strategia .v-treetable-node-open:before {
 	content: "\f0d7";
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 }
 
 .fi_semantum_strategia .v-splitpanel-horizontal  > div > .v-splitpanel-hsplitter {
@@ -10118,7 +10271,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-tabsheet-scroller [class*="Next"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f054";
 }
 
@@ -10127,7 +10280,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-tabsheet-scroller [class*="Prev"]:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f053";
 }
 
@@ -10385,8 +10538,8 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-colorpicker-popup .resize-button:before {
-	font-family: FontAwesome;
-	content: "\F141";
+	font-family: ThemeIcons;
+	content: "\f141";
 }
 
 .fi_semantum_strategia .v-colorpicker-popup .resize-button-caption {
@@ -10789,12 +10942,12 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-select-twincol-buttons .v-button-wrap:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f053";
 }
 
 .fi_semantum_strategia .v-select-twincol-buttons .v-button:first-child .v-button-wrap:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f054";
 }
 
@@ -10864,12 +11017,12 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-calendar-header-week .v-calendar-back:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f053";
 }
 
 .fi_semantum_strategia .v-calendar-header-week .v-calendar-next:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f054";
 }
 
@@ -11403,7 +11556,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-label-success:before, .fi_semantum_strategia .v-label-failure:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f00c";
 	margin-right: 0.5em;
 	margin-left: -19px;
@@ -11710,7 +11863,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-richtextarea .gwt-RichTextToolbar-top div:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 }
 
 .fi_semantum_strategia .v-richtextarea .gwt-RichTextToolbar-top div[title="Toggle Bold"]:before {
@@ -12181,7 +12334,7 @@ div.v-layout.v-horizontal.v-widget {
 }
 
 .fi_semantum_strategia .v-Notification.success .v-Notification-caption:before, .fi_semantum_strategia .v-Notification.failure .v-Notification-caption:before {
-	font-family: FontAwesome;
+	font-family: ThemeIcons;
 	content: "\f00c";
 	margin-right: 0.5em;
 }
@@ -12893,6 +13046,18 @@ rect.visio {
 	fill: #034ea2;
 }
 
+rect.mittariStatus {
+	stroke-width: 0;
+	stroke: #000000;
+	fill: #EEEEEE;
+}
+
+text.mittariStatus {
+	font-size: 9px;
+	text-anchor: middle;
+	fill: black;
+}
+
 rect.tavoite {
 	stroke-width: 0;
 	stroke: #000000;
@@ -12908,7 +13073,6 @@ rect.painopiste {
 text.header {
 	font-size: 14px;
 	text-decoration: underline;
-	text-anchor: middle;
 }
 
 text.visio.label {
@@ -12959,7 +13123,7 @@ text.painopisteMeter {
 }
 
 text.tavoiteMeter {
-	font-size: 10px;
+	font-size: 8px;
 }
 
 text.tavoite.idElement {
@@ -13001,8 +13165,8 @@ text.alikartta.FontAwesome {
 	cursor: pointer;
 }
 
-text.parents.link {
-	font-size: 7px;
+text.parent.link {
+	font-size: 10px;
 }
 
 path.header {
@@ -13114,6 +13278,14 @@ div.propertyHeader {
 	text-align: center;
 }
 
+div.menuHeader {
+	text-align: center;
+	margin-top: 3px;
+	margin-bottom: 3px;
+	margin-left: 3px;
+	margin-right: 3px;
+}
+
 div.v-button.redButton {
 	box-shadow: none;
 	color: #000000;
@@ -13132,4 +13304,141 @@ div.v-button.redButton {
 	color: #000000;
 	background: #beb;
 	opacity: 1;
+}
+
+text.fixed {
+	font-size: 50px;
+	font-family: FontAwesome;
+	font-style: normal;
+	font-weight: normal;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	display: inline-block;
+	text-align: center;
+}
+
+text.required {
+	font-size: 50px;
+	font-family: FontAwesome;
+	font-style: normal;
+	font-weight: normal;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	display: inline-block;
+	text-align: center;
+}
+
+text.infoElement {
+	font-size: 12px;
+	font-family: FontAwesome;
+	font-style: normal;
+	font-weight: normal;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	display: inline-block;
+	text-align: center;
+}
+
+text.meterElement {
+	font-size: 12px;
+	font-family: FontAwesome;
+	font-style: normal;
+	font-weight: normal;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	display: inline-block;
+	text-align: center;
+}
+
+.fi_semantum_strategia div.v-label.editMode {
+	background: #e88;
+	padding: 2px;
+	text-align: center;
+}
+
+.fi_semantum_strategia div.v-label.viewMode {
+	background: #9be;
+	padding: 2px;
+	text-align: center;
+}
+
+div.tooltip {
+	font-family: "Verdana", "Chewy", "Indie Flower", "Open Sans", Candara, Optima, Arial, sans-serif;
+	font-size: 14px;
+}
+
+div.v-slot-inputTableLevel0 {
+    margin-top : 2px;
+	padding-left : 10px;
+    margin-right : 10px;
+}
+
+div.v-slot-inputTableLevel1 {
+    margin-top : 2px;
+	padding-left : 40px;
+    margin-right : 10px;
+}
+
+div.v-slot-inputTableLevel2 {
+    margin-top : 2px;
+	padding-left : 70px;
+    margin-right : 10px;
+}
+
+div.v-slot-inputTableLevel3 {
+    margin-top : 2px;
+	margin-left : 100px;
+    margin-right : 10px;
+}
+
+div.v-slot-inputTableLevel4 {
+    margin-top : 2px;
+	margin-left : 130px;
+    margin-right : 10px;
+}
+
+div.v-slot-inputTableLevel5 {
+    margin-top : 2px;
+	margin-left : 160px;
+    margin-right : 10px;
+}
+
+div.v-slot-inputTableLevel6 {
+    margin-top : 2px;
+	margin-left : 190px;
+    margin-right : 10px;
+}
+
+div.v-slot-inputTableLayout0 {
+    background-color: #f00;
+	margin-left : 10px;
+}
+
+div.v-slot-inputTableLayout1 {
+    background-color: #0f0;
+	margin-left : 40px;
+}
+
+div.v-slot-inputTableLayout2 {
+    background-color: #f00;
+}
+
+div.v-slot-inputTableLayout3 {
+    background-color: #0f0;
+}
+
+div.v-slot-inputTableLayout4 {
+    background-color: #f00;
+}
+
+div.v-slot-inputTableLayout5 {
+    background-color: #0f0;
+}
+
+div.inputTableGroup {
+	border: 2px solid black; 
+	border-radius: 3px;
+	margin-top: 5px;
+	margin-bottom: 5px;
+	padding: 5px;
 }

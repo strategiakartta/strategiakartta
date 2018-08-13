@@ -30,27 +30,22 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 
 import javax.mail.MessagingException;
 
-import com.vaadin.data.Item;
 import com.vaadin.data.Property.ValueChangeEvent;
 import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.data.Validator;
 import com.vaadin.data.Validator.InvalidValueException;
-import com.vaadin.data.util.IndexedContainer;
-import com.vaadin.data.util.filter.SimpleStringFilter;
-import com.vaadin.data.util.filter.UnsupportedFilterException;
 import com.vaadin.event.FieldEvents.TextChangeEvent;
 import com.vaadin.event.FieldEvents.TextChangeListener;
-import com.vaadin.server.ExternalResource;
 import com.vaadin.server.FontAwesome;
 import com.vaadin.server.Page;
 import com.vaadin.server.Page.Styles;
 import com.vaadin.shared.ui.combobox.FilteringMode;
-import com.vaadin.shared.ui.label.ContentMode;
 import com.vaadin.ui.AbstractField;
 import com.vaadin.ui.AbstractLayout;
 import com.vaadin.ui.AbstractSelect.ItemCaptionMode;
@@ -65,10 +60,8 @@ import com.vaadin.ui.FormLayout;
 import com.vaadin.ui.HorizontalLayout;
 import com.vaadin.ui.Label;
 import com.vaadin.ui.ListSelect;
-import com.vaadin.ui.OptionGroup;
 import com.vaadin.ui.Panel;
 import com.vaadin.ui.PasswordField;
-import com.vaadin.ui.PopupView;
 import com.vaadin.ui.Table;
 import com.vaadin.ui.TextArea;
 import com.vaadin.ui.TextField;
@@ -76,9 +69,7 @@ import com.vaadin.ui.VerticalLayout;
 import com.vaadin.ui.Window;
 import com.vaadin.ui.themes.ValoTheme;
 
-import elemental.events.KeyboardEvent.KeyCode;
-import fi.semantum.strategia.action.MoveDown;
-import fi.semantum.strategia.action.MoveUp;
+import fi.semantum.strategia.Main.TimeInterval;
 import fi.semantum.strategia.custom.OnDemandFileDownloader;
 import fi.semantum.strategia.custom.OnDemandFileDownloader.OnDemandStreamSource;
 import fi.semantum.strategia.widget.Account;
@@ -94,10 +85,13 @@ import fi.semantum.strategia.widget.Painopiste;
 import fi.semantum.strategia.widget.Pair;
 import fi.semantum.strategia.widget.Property;
 import fi.semantum.strategia.widget.Relation;
+import fi.semantum.strategia.widget.ResponsibilityInstance;
+import fi.semantum.strategia.widget.ResponsibilityModel;
 import fi.semantum.strategia.widget.Right;
 import fi.semantum.strategia.widget.Strategiakartta;
 import fi.semantum.strategia.widget.Tag;
 import fi.semantum.strategia.widget.Tavoite;
+import fi.semantum.strategia.widget.TimeConfiguration;
 
 public class Utils {
 
@@ -127,562 +121,10 @@ public class Utils {
 	}
 
 	
-	public static Collection<String> extractTags(String text) {
-		
-		Set<String> result = new HashSet<String>();
-		
-		int pos = 0;
-		while(true) {
-			int start = text.indexOf('#', pos)+1;
-			if(start == 0) break;
-			pos = text.indexOf(' ', start+1);
-			if(pos == -1) {
-				result.add(text.substring(start));
-				break;
-			} else {
-				result.add(text.substring(start, pos));
-			}
-		}
-		
-		return result;
-		
-	}
 
-	static interface GoalCallback {
+
 		
-		public void selected(String uuid);
-		
-	}
 	
-	public static void defineImplementors(final Main main, final Base base) {
-
-		final Database database = main.getDatabase();
-		
-		VerticalLayout content = new VerticalLayout();
-		content.setSpacing(true);
-
-		Label desc = new Label("Valitse listasta kaikki m‰‰rityst‰ toteuttavat aliorganisaatiot.");
-		desc.addStyleName(ValoTheme.LABEL_TINY);
-		
-        content.addComponent(desc);
-        content.setComponentAlignment(desc, Alignment.MIDDLE_LEFT);
-        content.setExpandRatio(desc, 0.0f);
-
-        final OptionGroup table = new OptionGroup();
-        table.setNullSelectionAllowed(true);
-        table.setMultiSelect(true);
-        table.setCaption("Aliorganisaatiot");
-        
-        final Strategiakartta map = database.getMap(base);
-
-        final Map<Strategiakartta,Tavoite> implementationMap = new HashMap<Strategiakartta,Tavoite>();
-        final Set<String> currentlyImplemented = new HashSet<String>();
-        final Map<String,String> baseCaptions = new HashMap<String,String>();
-        
-        for(Linkki l : map.alikartat) {
-            Strategiakartta child = database.find(l.uuid);
-            if(child.generators.isEmpty()) {
-            	
-            	boolean found = false;
-            	for(Tavoite t : child.tavoitteet) {
-            		if(Utils.doesImplement(database, t, base)) {
-            			implementationMap.put(child, t);
-    		   			currentlyImplemented.add(child.uuid);
-            			found = true;
-            		}
-            	}
-            	
-		   		String s = child.getText(database) + " " + child.getId(database);
-		   		baseCaptions.put(child.uuid, s);
-		   			
-		   		table.addItem(child.uuid);
-		   		if(found) table.select(child.uuid);
-		   		
-            }
-        }
-        
-        ValueChangeListener l = new ValueChangeListener() {
-			
-			private static final long serialVersionUID = -5659750354602332507L;
-
-			@Override
-			public void valueChange(ValueChangeEvent event) {
-
-				Object selection = table.getValue();
-				Collection<?> selected = (Collection<?>)selection;
-				
-				for(Object o : table.getItemIds()) {
-					String baseCaption = baseCaptions.get(o);
-					if(selected.contains(o)) {
-						if(currentlyImplemented.contains(o)) {
-							table.setItemCaption(o, baseCaption);
-						} else {
-							table.setItemCaption(o, baseCaption + " (LISƒTƒƒN)");
-						}
-					} else {
-						if(currentlyImplemented.contains(o)) {
-							table.setItemCaption(o, baseCaption + " (POISTETAAN)");
-						} else {
-							table.setItemCaption(o, baseCaption);
-						}
-					}
-				}
-				
-			}
-			
-		};
-        
-		l.valueChange(null);
-		
-        table.addValueChangeListener(l);
-        
-        content.addComponent(table);
-        content.setExpandRatio(table, 1.0f);
-        
-		HorizontalLayout buttons = new HorizontalLayout();
-        buttons.setSpacing(true);
-        
-        Button copy = new Button("M‰‰rit‰", new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = -2067411013142475955L;
-
-			public void buttonClick(ClickEvent event) {
-            	
-            	Object selection = table.getValue();
-				Collection<?> selected = (Collection<?>)selection;
-				
-				Set<Base> denied = new HashSet<Base>();
-				
-				for(Object o : table.getItemIds()) {
-		            Strategiakartta child = database.find((String)o);
-					if(selected.contains(o)) {
-						if(!currentlyImplemented.contains(o)) {
-							Tavoite.createCopy(database, child, base);
-						}
-					} else {
-						if(currentlyImplemented.contains(o)) {
-							Tavoite current = implementationMap.get(child);
-							if(current.canRemove(database)) {
-								current.remove(database);
-							} else {
-								denied.add(current);
-							}
-						}
-					}
-				}
-				
-				Updates.updateJS(main, true);
-				
-				main.closeDialog();
-				
-				if(!denied.isEmpty()) {
-
-					VerticalLayout la = new VerticalLayout();
-					Label l = new Label("Seuraavat m‰‰ritykset ovat k‰ytˆss‰, eik‰ niit‰ voida poistaa:");
-					l.addStyleName(ValoTheme.LABEL_H3);
-					la.addComponent(l);
-					for(Base b : denied) {
-						Strategiakartta map = database.getMap(b);
-						Label l2 = new Label("&nbsp;&nbsp;&nbsp;&nbsp;" + b.getId(database) + " - " + b.getText(database) + " (" + map.getId(database) + ")");
-						l2.setContentMode(ContentMode.HTML);
-						la.addComponent(l2);
-					}
-
-					errorDialog(main, "Poistaminen ei onnistu", la);
-					
-				}
-				
-            }
-            
-        });
-        
-        buttons.addComponent(copy);
-
-		makeDialog(main, "M‰‰rit‰ toteuttajat", "Peruuta", content, buttons);
-
-	}
-
-	public static void selectGoalType(final Main main, Strategiakartta map, final GoalCallback callback) {
-
-		final Database database = main.getDatabase();
-
-		VerticalLayout content = new VerticalLayout();
-		content.setSizeFull();
-		content.setSpacing(true);
-
-		HorizontalLayout hl1 = new HorizontalLayout();
-		hl1.setWidth("100%");
-		hl1.setSpacing(true);
-
-		Button ok = new Button("Lis‰‰ oma " + map.ownGoalDescription.toLowerCase(), new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = 6054297133724400131L;
-
-			// inline click-listener
-            public void buttonClick(ClickEvent event) {
-            	main.closeDialog();
-            	callback.selected(null);
-            }
-            
-        });
-        
-        hl1.addComponent(ok);
-        hl1.setExpandRatio(ok, 0.0f);
-
-		Label uusiOma = new Label("Omat m‰‰ritykset eiv‰t perustu ylempien tasojen m‰‰rityksiin");
-		uusiOma.addStyleName(ValoTheme.LABEL_TINY);
-		
-        hl1.addComponent(uusiOma);
-        hl1.setComponentAlignment(uusiOma, Alignment.MIDDLE_LEFT);
-        hl1.setExpandRatio(uusiOma, 1.0f);
-
-        content.addComponent(hl1);
-        content.setExpandRatio(hl1, 0.0f);
-
-        Set<Base> alreadyImplemented = new HashSet<Base>();
-    	Relation implementsRelation = Relation.find(database, Relation.IMPLEMENTS);
-        for(Tavoite t : map.tavoitteet) {
-        	Pair p = implementsRelation.getPossibleRelation(t);
-        	if(p != null) {
-        		Base targetPP = database.find(p.second);
-        		alreadyImplemented.add(targetPP);
-        	}
-        }
-
-        HorizontalLayout buttons = new HorizontalLayout();
-        buttons.setSpacing(true);
-        
-        Strategiakartta parent_ = map.getPossibleParent(database); 
-
-        if(parent_ != null) {
-        
-	        final ListSelect table = new ListSelect();
-	        table.setSizeFull();
-	        table.setNullSelectionAllowed(false);
-	        table.setMultiSelect(false);
-	        table.setCaption("Lis‰‰ " + map.tavoiteDescription.toLowerCase() + " perustuen ylemm‰n tason (" + parent_.getId(database) + ") m‰‰ritykseen. Valitse m‰‰ritys listasta:");
-	        for(Linkki l : map.parents) {
-	            Strategiakartta parent = database.find(l.uuid);
-	            for(Tavoite t : parent.tavoitteet) {
-	            	for(Painopiste p : t.painopisteet) {
-	            		if(alreadyImplemented.contains(p)) continue;
-	            		table.addItem(p.uuid);
-	            		table.setItemCaption(p.uuid, p.getId(database) + ": " + p.getText(database));
-	            	}
-	            }
-	        }
-	        
-	        final Button copy = new Button("Lis‰‰ toteuttava " + map.tavoiteDescription.toLowerCase(), new Button.ClickListener() {
-	        	
-				private static final long serialVersionUID = 1L;
-	
-				// inline click-listener
-	            public void buttonClick(ClickEvent event) {
-	            	Object selected = table.getValue();
-	            	if(selected == null) return;
-	            	main.closeDialog();
-	            	callback.selected((String)selected);
-	            }
-	            
-	        });
-	        
-	        ValueChangeListener l = new ValueChangeListener() {
-				
-				private static final long serialVersionUID = 192004471077387400L;
-	
-				@Override
-				public void valueChange(ValueChangeEvent event) {
-	
-					Object selection = table.getValue();
-					if(selection == null) {
-						copy.setEnabled(false);
-					} else {
-						copy.setEnabled(true);
-					}
-					
-				}
-				
-			};
-	        
-			l.valueChange(null);
-			
-	        table.addValueChangeListener(l);
-	        
-	        content.addComponent(table);
-	        content.setExpandRatio(table, 1.0f);
-
-	        copy.setEnabled(false);
-	        
-	        buttons.addComponent(copy);
-
-        }
-
-		makeDialog(main, "M‰‰rit‰ uusi " + map.tavoiteDescription.toLowerCase(), "Peruuta", content, buttons);
-
-	}
-
-	public static void selectMonitorTagsDialog(final Main main, Strategiakartta map, final DialogCallback<Collection<Tag>> callback) {
-
-		final Database database = main.getDatabase();
-		
-		HashSet<Tag> monitorTags = new HashSet<Tag>();
-		for(Base b : map.getOwners(database)) {
-			monitorTags.addAll(b.getMonitorTags(database));
-		}
-		
-		VerticalLayout content = new VerticalLayout();
-		content.setSizeFull();
-		content.setSpacing(true);
-
-        final OptionGroup table = new OptionGroup();
-        table.setNullSelectionAllowed(true);
-        table.setMultiSelect(true);
-        table.setWidth("100%");
-        
-        for(Tag t : monitorTags) {
-        	table.addItem(t);
-        	table.setItemCaption(t, t.getId(database));
-        }
-        
-        content.addComponent(table);
-
-        HorizontalLayout buttons = new HorizontalLayout();
-        buttons.setSpacing(true);
-        
-		Button ok = new Button("Valitse", new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = 1657687721482107951L;
-
-			@SuppressWarnings("unchecked")
-			public void buttonClick(ClickEvent event) {
-            	main.closeDialog();
-            	callback.finished((Collection<Tag>)table.getValue());
-            }
-            
-        });
-        
-        buttons.addComponent(ok);
-        buttons.setExpandRatio(ok, 0.0f);
-
-		makeDialog(main, "300px", "600px", "Valitse n‰ytett‰v‰t", "Peruuta", content, buttons);
-
-	}
-
-	public static void selectFocusType(final Main main, Strategiakartta map, Tavoite goal, String desc, final GoalCallback callback) {
-
-		final Database database = main.getDatabase();
-
-		VerticalLayout content = new VerticalLayout();
-		content.setSizeFull();
-		content.setSpacing(true);
-
-		HorizontalLayout hl1 = new HorizontalLayout();
-		hl1.setWidth("100%");
-		hl1.setSpacing(true);
-
-		Button ok = new Button("Luo uusi " + desc.toLowerCase(), new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = 2929104928507341296L;
-
-			// inline click-listener
-            public void buttonClick(ClickEvent event) {
-            	main.closeDialog();
-            	callback.selected(null);
-            }
-            
-        });
-        
-        hl1.addComponent(ok);
-        hl1.setExpandRatio(ok, 0.0f);
-
-		Label uusiOma = new Label("Uusi " + desc.toLowerCase() + " luodaan t‰m‰n strategiakartan alle.");
-		uusiOma.addStyleName(ValoTheme.LABEL_TINY);
-		
-        hl1.addComponent(uusiOma);
-        hl1.setComponentAlignment(uusiOma, Alignment.MIDDLE_LEFT);
-        hl1.setExpandRatio(uusiOma, 1.0f);
-
-        content.addComponent(hl1);
-        content.setExpandRatio(hl1, 0.0f);
-
-        HorizontalLayout buttons = new HorizontalLayout();
-        buttons.setSpacing(true);
-        
-        Strategiakartta parent_ = map.getPossibleParent(database);
-        
-        Set<Painopiste> avail = new HashSet<Painopiste>();
-        // Add all
-        for(Tavoite t : map.tavoitteet) {
-        	for(Painopiste p : t.painopisteet) {
-        		avail.add(p);
-        	}
-        }
-        // Remove current
-    	for(Painopiste p : goal.painopisteet) {
-    		avail.remove(p);
-    	}
-
-        if(parent_ != null) {
-        
-	        final ListSelect table = new ListSelect();
-	        table.setSizeFull();
-	        table.setNullSelectionAllowed(false);
-	        table.setMultiSelect(false);
-	        table.setCaption("Lis‰‰ kartan alle m‰‰ritelty " + desc.toLowerCase() + ":");
-	        for(Painopiste p : avail) {
-	        	table.addItem(p.uuid);
-	        	table.setItemCaption(p.uuid, p.getText(database));
-	        }
-	        
-	        final Button copy = new Button("Lis‰‰ olemassaoleva " + desc.toLowerCase(), new Button.ClickListener() {
-	        	
-				private static final long serialVersionUID = 1L;
-	
-				// inline click-listener
-	            public void buttonClick(ClickEvent event) {
-	            	Object selected = table.getValue();
-	            	if(selected == null) return;
-	            	main.closeDialog();
-	            	callback.selected((String)selected);
-	            }
-	            
-	        });
-	        
-	        ValueChangeListener l = new ValueChangeListener() {
-				
-				private static final long serialVersionUID = 192004471077387400L;
-	
-				@Override
-				public void valueChange(ValueChangeEvent event) {
-	
-					Object selection = table.getValue();
-					if(selection == null) {
-						copy.setEnabled(false);
-					} else {
-						copy.setEnabled(true);
-					}
-					
-				}
-				
-			};
-	        
-			l.valueChange(null);
-			
-	        table.addValueChangeListener(l);
-	        
-	        content.addComponent(table);
-	        content.setExpandRatio(table, 1.0f);
-
-	        copy.setEnabled(false);
-	        
-	        buttons.addComponent(copy);
-
-        }
-
-		makeDialog(main, "M‰‰rit‰ " + desc.toLowerCase(), "Peruuta", content, buttons);
-
-	}
-	
-	private static void doLogin(Main main, Window subwindow, Label l, String usr, String pass) {
-
-		Database database = main.getDatabase();
-    	String hash = Utils.hash(pass);
-    	Account acc = Account.find(database, usr);
-    	if(acc != null) {
-    		if(hash.equals(acc.getHash())) {
-            	main.removeWindow(subwindow);
-            	main.account = acc;
-            	main.hallinnoi.setVisible(acc.isAdmin());
-            	main.tili.setVisible(true);
-            	Updates.update(main, false);
-            	main.login.setCaption("Kirjaudu ulos " + acc.getId(database));
-            	main.saveState.setEnabled(true);
-    			return;
-    		}
-    	}
-    	l.setVisible(true);
-
-	}
-		
-	public static void login(final Main main) {
-
-        final Window subwindow = new Window("Anna k‰ytt‰j‰tunnus ja salasana", new VerticalLayout());
-        subwindow.setModal(true);
-        subwindow.setWidth("400px");
-        subwindow.setHeight("295px");
-        subwindow.setResizable(false);
-
-        final VerticalLayout winLayout = (VerticalLayout) subwindow.getContent();
-        winLayout.setMargin(true);
-        winLayout.setSpacing(true);
-
-        final TextField tf = new TextField();
-        tf.setWidth("100%");
-        tf.addStyleName(ValoTheme.TEXTFIELD_SMALL);
-        tf.addStyleName(ValoTheme.TEXTFIELD_BORDERLESS);
-        tf.setCaption("K‰ytt‰j‰tunnus:");
-        tf.setId("loginUsernameField");
-        winLayout.addComponent(tf);
-
-        final PasswordField pf = new PasswordField();
-        pf.setCaption("Salasana:");
-        pf.addStyleName(ValoTheme.TEXTFIELD_SMALL);
-        pf.addStyleName(ValoTheme.TEXTFIELD_BORDERLESS);
-        pf.setWidth("100%");
-        pf.setId("loginPasswordField");
-        winLayout.addComponent(pf);
-
-        final Label l = new Label("V‰‰r‰ k‰ytt‰j‰tunnus tai salasana");
-        l.addStyleName(ValoTheme.LABEL_FAILURE);
-        l.addStyleName(ValoTheme.LABEL_TINY);
-        l.setVisible(false);
-        winLayout.addComponent(l);
-
-        pf.addValueChangeListener(new ValueChangeListener() {
-			
-			private static final long serialVersionUID = -2708082203576343391L;
-
-        	@Override
-			public void valueChange(ValueChangeEvent event) {
-        		doLogin(main, subwindow, l, tf.getValue(), pf.getValue());
-			}
-		});
-
-        HorizontalLayout hl = new HorizontalLayout();
-        hl.setSpacing(true);
-        
-        Button ok = new Button("Kirjaudu", new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = -5148036024457593062L;
-
-			public void buttonClick(ClickEvent event) {
-        		doLogin(main, subwindow, l, tf.getValue(), pf.getValue());
-            }
-            
-        });
-        
-        hl.addComponent(ok);
-
-        Button close = new Button("Peruuta", new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = -5719853213838228457L;
-
-			public void buttonClick(ClickEvent event) {
-            	main.removeWindow(subwindow);
-            }
-            
-        });
-        
-        hl.addComponent(close);
-        
-        winLayout.addComponent(hl);
-        winLayout.setComponentAlignment(hl, Alignment.BOTTOM_CENTER);
-		main.addWindow(subwindow);
-		
-		tf.setCursorPosition(tf.getValue().length());
-
-	}
-
 	public static void modifyAccount(final Main main) {
 
 		final Database database = main.getDatabase();
@@ -747,7 +189,12 @@ public class Utils {
         buttons.setSpacing(true);
         buttons.setMargin(false);
 
-        Button apply = new Button("Tee muutokset", new Button.ClickListener() {
+        Button apply = new Button("Tee muutokset");
+        
+        buttons.addComponent(apply);
+        
+        final Window dialog = Dialogs.makeDialog(main, "450px", "480px", "K‰ytt‰j‰tilin asetukset", "Poistu", content, buttons);
+        apply.addClickListener(new Button.ClickListener() {
         	
 			private static final long serialVersionUID = 1992235622970234624L;
 
@@ -777,15 +224,12 @@ public class Utils {
             	main.account.hash = Utils.hash(pf2.getValue());
 
             	Updates.update(main, true);
-    			main.closeDialog();
+            	
+            	main.removeWindow(dialog);
             	
             }
             
         });
-        
-        buttons.addComponent(apply);
-        
-        makeDialog(main, "450px", "480px", "K‰ytt‰j‰tilin asetukset", "Poistu", content, buttons);
 
 	}
 	
@@ -817,12 +261,40 @@ public class Utils {
 		if(state != null) {
 			for(int i=0;i<state.rights.size();i++) {
 				Right r = state.rights.get(i);
-				table.addItem(new Object[] { r.map.getId(database), r.write ? "Muokkaus" : "Luku", r.recurse ? "Alikartat" : "Valittu kartta" }, i+1);
+				table.addItem(new Object[] { r.map.getId(database), r.write ? "Muokkaus" : "Luku", r.recurse ? ALATASON_KARTAT : VALITTU_KARTTA }, i+1);
 			}
 		}
 
 	}
 
+	public static final String ALATASON_KARTAT = "Alatason kartat";
+	public static final String VALITTU_KARTTA = "Valittu kartta";
+	
+	public static String findFreshUserName(Validator validator) {
+		
+		String proposal = "Uusi k‰ytt‰j‰";
+		
+		try {
+			
+			validator.validate(proposal);
+			return proposal;
+			
+		} catch (InvalidValueException e) {
+
+			int counter = 2;
+			while(true) {
+				proposal = "Uusi k‰ytt‰j‰ " + counter++;
+				try {
+					validator.validate(proposal);
+					return proposal;
+				} catch (InvalidValueException e2) {
+				}
+			}
+			
+		}
+		
+	}
+	
 	public static void manage(final Main main) {
 
 		final Database database = main.getDatabase();
@@ -873,6 +345,21 @@ public class Utils {
 
         final TextField tf = new TextField();
         
+        Validator nameValidator = new Validator() {
+
+			private static final long serialVersionUID = -4779239111120669168L;
+
+			@Override
+			public void validate(Object value) throws InvalidValueException {
+				String s = (String)value;
+				if(s.isEmpty())
+					throw new InvalidValueException("Nimi ei saa olla tyhj‰");
+				if(accountMap.containsKey(s))
+					throw new InvalidValueException("Nimi on jo k‰ytˆss‰");
+			}
+			
+		};
+        
 		final Button save = new Button("Luo", new Button.ClickListener() {
 
 			private static final long serialVersionUID = -6053708137324681886L;
@@ -889,7 +376,7 @@ public class Utils {
 		        makeAccountCombo(main, accountMap, users);
 		        makeAccountTable(database, users, accountMap, table);
 
-				infoDialog(main, "Uusi k‰ytt‰j‰ '" + tf.getValue() + "' luotu", "K‰ytt‰j‰n salasana on " + pass + "", null);
+		        Dialogs.infoDialog(main, "Uusi k‰ytt‰j‰ '" + tf.getValue() + "' luotu", "K‰ytt‰j‰n salasana on " + pass + "", null);
 
 			}
 
@@ -923,7 +410,7 @@ public class Utils {
         tf.setWidth("100%");
         tf.addStyleName(ValoTheme.TEXTFIELD_SMALL);
         tf.setCaption("Luo uusi k‰ytt‰j‰ nimell‰:");
-		tf.setValue("Uusi k‰ytt‰j‰");
+		tf.setValue(findFreshUserName(nameValidator));
 		tf.setCursorPosition(tf.getValue().length());
 		tf.setValidationVisible(true);
 		tf.setInvalidCommitted(true);
@@ -945,20 +432,7 @@ public class Utils {
 			}
 			
 		});
-		tf.addValidator(new Validator() {
-
-			private static final long serialVersionUID = -4779239111120669168L;
-
-			@Override
-			public void validate(Object value) throws InvalidValueException {
-				String s = (String)value;
-				if(s.isEmpty())
-					throw new InvalidValueException("Nimi ei saa olla tyhj‰");
-				if(accountMap.containsKey(s))
-					throw new InvalidValueException("Nimi on jo k‰ytˆss‰");
-			}
-			
-		});
+		tf.addValidator(nameValidator);
 		if(!tf.isValid()) save.setEnabled(false);
 		
 		hl1.addComponent(users);
@@ -1069,9 +543,9 @@ public class Utils {
 		propagateSelect.setNullSelectionAllowed(false);
 		propagateSelect.addStyleName(ValoTheme.COMBOBOX_SMALL);
 		propagateSelect.setCaption("Valitse laajuus:");
-		propagateSelect.addItem("Valittu kartta");
-		propagateSelect.addItem("Alikartat");
-		propagateSelect.select("Valittu kartta");
+		propagateSelect.addItem(VALITTU_KARTTA);
+		propagateSelect.addItem(ALATASON_KARTAT);
+		propagateSelect.select(VALITTU_KARTTA);
 
 		final Button addRight = new Button("Lis‰‰ rivi", new Button.ClickListener() {
 
@@ -1087,7 +561,7 @@ public class Utils {
 				String right = (String)rightSelect.getValue();
 				String propagate = (String)propagateSelect.getValue();
 
-				Right r = new Right(map, right.equals("Muokkaus"), propagate.equals("Alikartat"));
+				Right r = new Right(map, right.equals("Muokkaus"), propagate.equals(ALATASON_KARTAT));
 				state.rights.add(r);
 
 				Updates.update(main, true);
@@ -1146,15 +620,121 @@ public class Utils {
         content.setComponentAlignment(hl2, Alignment.BOTTOM_LEFT);
         content.setExpandRatio(hl2, 0.0f);
 
+        final VerticalLayout vl = new VerticalLayout();
+
+        final Panel p = new Panel();
+        p.setWidth("100%");
+        p.setHeight("200px");
+        p.setContent(vl);
+        
+        final TimeConfiguration tc = TimeConfiguration.getInstance(database); 
+        
+        final TextField tf2 = new TextField();
+        tf2.setWidth("200px");
+        tf2.addStyleName(ValoTheme.TEXTFIELD_SMALL);
+        tf2.setCaption("Strategiakartan m‰‰ritysaika:");
+		tf2.setValue(tc.getRange());
+		tf2.setCursorPosition(tf.getValue().length());
+		tf2.setValidationVisible(true);
+		tf2.setInvalidCommitted(true);
+		tf2.setImmediate(true);
+		tf2.addTextChangeListener(new TextChangeListener() {
+			
+			private static final long serialVersionUID = -8274588731607481635L;
+
+			@Override
+			public void textChange(TextChangeEvent event) {
+				tf2.setValue(event.getText());
+				try {
+					tf2.validate();
+					tc.setRange(event.getText());
+					updateYears(database, vl);
+					Updates.update(main, true);
+				} catch (InvalidValueException e) {
+					return;
+				}
+			}
+			
+		});
+		tf2.addValidator(new Validator() {
+
+			private static final long serialVersionUID = -4779239111120669168L;
+
+			@Override
+			public void validate(Object value) throws InvalidValueException {
+				String s = (String)value;
+				TimeInterval ti = TimeInterval.parse(s);
+				long start = ti.startYear;
+				long end = ti.endYear;
+				if(start < 2015)
+					throw new InvalidValueException("Alkuvuosi ei voi olla aikaisempi kuin 2015.");
+				if(end > 2025)
+					throw new InvalidValueException("P‰‰ttymisvuosi ei voi olla myˆh‰isempi kuin 2025.");
+				if(end-start > 9)
+					throw new InvalidValueException("Strategiakartta ei tue yli 10 vuoden tarkasteluja.");
+			}
+			
+		});
+
+		content.addComponent(tf2);
+        content.setComponentAlignment(tf2, Alignment.BOTTOM_LEFT);
+        content.setExpandRatio(tf2, 0.0f);
+        
+        updateYears(database, vl);
+        
+        content.addComponent(p);
+        content.setComponentAlignment(p, Alignment.BOTTOM_LEFT);
+        content.setExpandRatio(p, 0.0f);
+
         HorizontalLayout buttons = new HorizontalLayout();
         buttons.setSpacing(true);
         buttons.setMargin(false);
         
-		makeDialog(main, "Hallinnoi strategiakarttaa", "Sulje", content, buttons);
+        Dialogs.makeDialog(main, main.dialogWidth(), main.dialogHeight(0.8), "Hallinnoi strategiakarttaa", "Sulje", content, buttons);
 
 	}
+	
+	public static void updateYears(final Database database, final VerticalLayout vl) {
 
-	public static void setUserMeter(final Main main, Base base, final Meter m) {
+		vl.removeAllComponents();
+		
+		final TimeConfiguration tc = TimeConfiguration.getInstance(database);
+        TimeInterval ti = TimeInterval.parse(tc.getRange());
+        for(int i=ti.startYear;i<=ti.endYear;i++) {
+        	final int year = i;
+        	HorizontalLayout hl = new HorizontalLayout();
+        	hl.setSpacing(true);
+        	String caption = Integer.toString(i) + (tc.isFrozen(i) ? " Muutokset estetty" : " Muokattavissa");
+        	Label l = new Label(caption);
+        	l.setWidth("250px");
+        	l.setHeight("100%");
+        	hl.addComponent(l);
+        	Button b = new Button(tc.isFrozen(i) ? "Avaa muokattavaksi" : "Est‰ muutokset");
+        	b.addStyleName(ValoTheme.BUTTON_SMALL);
+        	b.addClickListener(new ClickListener() {
+				
+				private static final long serialVersionUID = 556680407448842136L;
+
+				@Override
+				public void buttonClick(ClickEvent event) {
+					if(tc.isFrozen(year)) {
+						tc.unfreeze(year);
+					} else {
+						tc.freeze(year);
+					}
+					updateYears(database, vl);
+				}
+				
+			});
+        	b.setWidth("200px");
+        	hl.addComponent(b);
+        	//hl.setWidth("100%");
+        	vl.addComponent(hl);
+        }
+		
+	}
+
+	public static void setUserMeter(final Main main, final Base base, final Meter m) {
 
 		final Database database = main.getDatabase();
 
@@ -1167,23 +747,55 @@ public class Utils {
         winLayout.setMargin(true);
         winLayout.setSpacing(true);
 
-        final Label header = new Label(m.getCaption(database));
-        header.addStyleName(ValoTheme.LABEL_LARGE);
-        winLayout.addComponent(header);
+        String caption = m.getCaption(database);
+        if(caption != null && !caption.isEmpty()) {
+            final Label header = new Label(caption);
+            header.addStyleName(ValoTheme.LABEL_LARGE);
+            winLayout.addComponent(header);
+        }
         
-		Indicator indicator = m.getPossibleIndicator(database);
+		final Indicator indicator = m.getPossibleIndicator(database);
 		if(indicator == null) return;
 		
 		Datatype dt = indicator.getDatatype(database);
 		if(!(dt instanceof EnumerationDatatype)) return;
+
+		final Label l = new Label("Selite: " + indicator.getValueShortComment());
+
+		AbstractField<?> forecastField = dt.getEditor(main, base, indicator, true, new CommentCallback() {
+			
+			@Override
+			public void runWithComment(String shortComment, String comment) {
+				l.setValue("Selite: " + indicator.getValueShortComment());
+			}
+			
+			@Override
+			public void canceled() {
+			}
+			
+		});
+		forecastField.setWidth("100%");
+		forecastField.setCaption("Ennuste");
+		winLayout.addComponent(forecastField);
 		
-		AbstractField<?> field = dt.getEditor(main, base, indicator);
-		field.setWidth("100%");
+		AbstractField<?> currentField = dt.getEditor(main, base, indicator, false, new CommentCallback() {
+			
+			@Override
+			public void runWithComment(String shortComment, String comment) {
+				l.setValue("Selite: " + indicator.getValueShortComment());
+			}
+			
+			@Override
+			public void canceled() {
+			}
+			
+		});
+		currentField.setWidth("100%");
+		currentField.setCaption("Toteuma");
+		winLayout.addComponent(currentField);
 		
-		winLayout.addComponent(field);
-		
-		Label l = new Label(indicator.getValueShortComment());
 		winLayout.addComponent(l);
+		
 		l.setWidth("100%");
 		winLayout.setComponentAlignment(l, Alignment.BOTTOM_CENTER);
         
@@ -1201,8 +813,20 @@ public class Utils {
             
         });
         
+        Button define = new Button("M‰‰rit‰", new Button.ClickListener() {
+        	
+			private static final long serialVersionUID = 1364802814012491490L;
+
+			public void buttonClick(ClickEvent event) {
+				Meter.editMeter(main, base, m);
+            }
+            
+        });
+
         hl.addComponent(ok);
 		hl.setComponentAlignment(ok, Alignment.BOTTOM_LEFT);
+        hl.addComponent(define);
+		hl.setComponentAlignment(define, Alignment.BOTTOM_LEFT);
 
 		main.addWindow(subwindow);
 		
@@ -1302,30 +926,7 @@ public class Utils {
         content.addComponent(table);
         content.setExpandRatio(table, 1.0f);
         
-		final Button remove = new Button("Poista valitut n‰kym‰t", new Button.ClickListener() {
-
-			private static final long serialVersionUID = -4680588998085550908L;
-
-			public void buttonClick(ClickEvent event) {
-
-				Object selection = table.getValue();
-				Collection<?> selected = (Collection<?>)selection;
-				
-				if(!selected.isEmpty()) {
-					
-					for(Object o : selected) {
-						UIState state = stateMap.get(o);
-						if(state != null)
-							main.account.uiStates.remove(state);
-					}
-					Updates.update(main, true);
-				}
-				
-				main.closeDialog();
-
-			}
-
-		});
+		final Button remove = new Button("Poista valitut n‰kym‰t");
 		
         table.addValueChangeListener(new ValueChangeListener() {
 			
@@ -1356,11 +957,164 @@ public class Utils {
         buttons.setSpacing(true);
         buttons.setMargin(false);
         
-		makeDialog(main, "N‰kymien hallinta", "Sulje",  content, buttons);
+        final Window dialog = Dialogs.makeDialog(main, "N‰kymien hallinta", "Sulje",  content, buttons);
+        
+        remove.addClickListener(new Button.ClickListener() {
+
+			private static final long serialVersionUID = -4680588998085550908L;
+
+			public void buttonClick(ClickEvent event) {
+
+				Object selection = table.getValue();
+				Collection<?> selected = (Collection<?>)selection;
+				
+				if(!selected.isEmpty()) {
+					
+					for(Object o : selected) {
+						UIState state = stateMap.get(o);
+						if(state != null)
+							main.account.uiStates.remove(state);
+					}
+					Updates.update(main, true);
+				}
+				
+				main.removeWindow(dialog);
+
+			}
+
+		});
 
 	}
 	
-	public static void addMap(final Main main, Strategiakartta map) {
+	public static void addMap(final Main main, final Strategiakartta parent) {
+
+		final Database database = main.getDatabase();
+		
+		FormLayout content = new FormLayout();
+		content.setSizeFull();
+
+//		final TextField tf = new TextField();
+//		tf.setCaption("Kartan tunniste:");
+//		tf.setValue("tunniste");
+//		tf.setWidth("100%");
+//		content.addComponent(tf);
+
+		final TextField tf2 = new TextField();
+		tf2.setCaption("Kartan nimi:");
+		tf2.setValue("Uusi kartta");
+		tf2.setWidth("100%");
+		content.addComponent(tf2);
+		
+		final ComboBox combo = new ComboBox();
+		combo.setCaption("Kartan tyyppi:");
+		combo.setNullSelectionAllowed(false);
+		combo.setWidth("100%");
+		content.addComponent(combo);
+		
+		Collection<Base> subs = Strategiakartta.availableLevels(database);
+		for(Base b : subs) {
+			combo.addItem(b.uuid);
+			combo.setItemCaption(b.uuid, b.getText(database));
+			combo.select(b.uuid);
+		}
+
+		HorizontalLayout buttons = new HorizontalLayout();
+        buttons.setSpacing(true);
+        buttons.setMargin(true);
+		
+		Button ok = new Button("Lis‰‰");
+		buttons.addComponent(ok);
+
+		final Window dialog = Dialogs.makeDialog(main, "450px", "340px", "Lis‰‰ alatason kartta", "Peruuta", content, buttons);
+		ok.addClickListener(new Button.ClickListener() {
+			
+			private static final long serialVersionUID = 1422158448876521843L;
+
+			public void buttonClick(ClickEvent event) {
+				
+				String name = tf2.getValue();
+				String typeUUID = (String)combo.getValue();
+				Base type = database.find(typeUUID);
+				
+				database.newMap(main, parent, "", name, type);
+				Updates.updateJS(main, true);
+				main.removeWindow(dialog);
+				
+
+			}
+		});
+		
+	}
+	
+	public static void addImplementationMap(final Main main, final Tavoite goal) {
+
+		final Database database = main.getDatabase();
+
+		try {
+			Base subType = goal.getPossibleSubmapType(database);
+			if(subType != null) {
+				goal.ensureImplementationMap(main);
+				Updates.updateJS(main, true);
+				return;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			return;
+		}
+		
+		FormLayout content = new FormLayout();
+		content.setSizeFull();
+		
+		final ComboBox combo = new ComboBox();
+		combo.setCaption("Kartan tyyppi:");
+		combo.setNullSelectionAllowed(false);
+		combo.setWidth("100%");
+		content.addComponent(combo);
+		
+		Collection<Base> subs = Strategiakartta.availableLevels(database);
+		for(Base b : subs) {
+			combo.addItem(b.uuid);
+			combo.setItemCaption(b.uuid, b.getText(database));
+			combo.select(b.uuid);
+		}
+
+		HorizontalLayout buttons = new HorizontalLayout();
+        buttons.setSpacing(true);
+        buttons.setMargin(true);
+		
+		Button ok = new Button("Lis‰‰");
+		buttons.addComponent(ok);
+
+		final Window dialog = Dialogs.makeDialog(main, "450px", "340px", "Lis‰‰ alatason kartta", "Peruuta", content, buttons);
+		ok.addClickListener(new Button.ClickListener() {
+			
+			private static final long serialVersionUID = 1422158448876521843L;
+
+			public void buttonClick(ClickEvent event) {
+				
+				String typeUUID = (String)combo.getValue();
+				Base type = database.find(typeUUID);
+				
+				Strategiakartta parent = database.getMap(goal);
+				
+				Strategiakartta newMap = database.newMap(main, parent, "", "", type);
+				newMap.addRelation(Relation.find(database, Relation.IMPLEMENTS), goal);
+				
+				for(Painopiste pp : goal.painopisteet) {
+					Tavoite.createCopy(main, newMap, pp);
+				}
+				
+				Updates.updateJS(main, true);
+				main.removeWindow(dialog);
+
+			}
+		});
+		
+	}
+
+
+	
+	public static void insertRootMap(final Main main, final Strategiakartta currentRoot) {
 
 		final Database database = main.getDatabase();
 
@@ -1380,17 +1134,15 @@ public class Utils {
 		content.addComponent(tf2);
 		
 		final ComboBox combo = new ComboBox();
-		combo.setCaption("Organisaatiotaso:");
+		combo.setCaption("Kartan tyyppi:");
 		combo.setNullSelectionAllowed(false);
 		combo.setWidth("100%");
 		content.addComponent(combo);
 		
-		Property levelProperty = Property.find(database, Property.LEVEL);
-		ObjectType level = database.find((String)levelProperty.getPropertyValue(map));
-
-		for(Base b : level.getRelatedObjects(database, Relation.find(database, Relation.ALLOWS_SUBMAP))) {
+		Collection<Base> subs = Strategiakartta.availableLevels(database);
+		for(Base b : subs) {
 			combo.addItem(b.uuid);
-			combo.setItemCaption(b.uuid, b.getId(database));
+			combo.setItemCaption(b.uuid, b.getText(database));
 			combo.select(b.uuid);
 		}
 
@@ -1398,7 +1150,11 @@ public class Utils {
         buttons.setSpacing(true);
         buttons.setMargin(true);
 		
-		Button ok = new Button("Lis‰‰", new Button.ClickListener() {
+		Button ok = new Button("Lis‰‰");
+		buttons.addComponent(ok);
+
+		final Window dialog = Dialogs.makeDialog(main, "450px", "340px", "Lis‰‰ alatason kartta", "Peruuta", content, buttons);
+		ok.addClickListener(new Button.ClickListener() {
 			
 			private static final long serialVersionUID = 1422158448876521843L;
 
@@ -1409,16 +1165,13 @@ public class Utils {
 				String typeUUID = (String)combo.getValue();
 				Base type = database.find(typeUUID);
 				
-				database.newMap(main, main.uiState.current, id, name, type);
+				Strategiakartta uusi = database.newMap(main, null, id, name, type);
+				uusi.addAlikartta(currentRoot);
 				Updates.updateJS(main, true);
-				main.closeDialog();
-				
+				main.removeWindow(dialog);
 
 			}
 		});
-		buttons.addComponent(ok);
-
-		makeDialog(main, "450px", "340px", "Lis‰‰ aliorganisaatio", "Peruuta", content, buttons);
 		
 	}
 	
@@ -1455,23 +1208,26 @@ public class Utils {
 				
 				String uuid = UUID.randomUUID().toString(); 
 				
-				temp = new File("printing", uuid + ".pdf");
+				File printing = new File(Main.baseDirectory(), "printing");
+				
+				temp = new File(printing, uuid + ".pdf");
 
 				if(svgText != null) {
 
-					File htmlFile = new File("printing", uuid + ".html");
-					File script = new File("printing", uuid + ".js");
+					File htmlFile = new File(printing, uuid + ".html");
+					File script = new File(printing, uuid + ".js");
 					
 		        	try {
 		        		
-		        		String html = PhantomJSDriver.printHtml(svgText);
+		        		String html = PhantomJSDriver.printHtml(svgText, Main.getAppFile("print.html").getParentFile().getAbsolutePath());
 						Files.write(htmlFile.toPath(), html.getBytes(Charset.forName("UTF-8")));
 		        		
 						String browserUrl = htmlFile.toURI().toURL().toString();
 		        		
-			        	String printCommand = PhantomJSDriver.printCommand(browserUrl, temp.getName());
+			        	String printCommand = PhantomJSDriver.printCommand(browserUrl, temp.getAbsolutePath());
 			        	
 						Files.write(script.toPath(), printCommand.getBytes());
+						
 						PhantomJSDriver.execute(script);
 						
 						return new FileInputStream(temp);
@@ -1505,7 +1261,7 @@ public class Utils {
 		dl.getResource().setCacheTime(0);
 		dl.extend(ok);
 
-		makeDialog(main, "420px", "135px", "Haluatko ladata kartan PDF-muodossa?", "Sulje", content, buttons);
+		final Window dialog = Dialogs.makeDialog(main, "420px", "135px", "Haluatko ladata kartan PDF-muodossa?", "Sulje", content, buttons);
 		
 	}
 
@@ -1529,7 +1285,7 @@ public class Utils {
 		content.addComponent(tf2);
 
 		final ComboBox combo = new ComboBox();
-		combo.setCaption("Organisaatiotaso:");
+		combo.setCaption("Kartan tyyppi:");
 		combo.setNullSelectionAllowed(false);
 		combo.setWidth("100%");
 		content.addComponent(combo);
@@ -1537,9 +1293,10 @@ public class Utils {
 		Property levelProperty = Property.find(database, Property.LEVEL);
 		ObjectType level = database.find((String)levelProperty.getPropertyValue(map));
 
-		for(Base b : level.getRelatedObjects(database, Relation.find(database, Relation.ALLOWS_SUBMAP))) {
+		Collection<Base> subs = Strategiakartta.availableLevels(database);
+		for(Base b : subs) {
 			combo.addItem(b.uuid);
-			combo.setItemCaption(b.uuid, b.getId(database));
+			combo.setItemCaption(b.uuid, b.getText(database));
 			combo.select(b.uuid);
 		}
 
@@ -1559,7 +1316,11 @@ public class Utils {
         buttons.setSpacing(true);
         buttons.setMargin(true);
 		
-		Button ok = new Button("Lis‰‰", new Button.ClickListener() {
+		Button ok = new Button("Lis‰‰");
+		buttons.addComponent(ok);
+
+		final Window dialog = Dialogs.makeDialog(main, "450px", "380px", "Lis‰‰ n‰kym‰", "Peruuta", content, buttons);
+		ok.addClickListener(new Button.ClickListener() {
 			
 			private static final long serialVersionUID = 1422158448876521843L;
 
@@ -1577,217 +1338,11 @@ public class Utils {
 				newMap.generators.add(tag);
 				
 				Updates.updateJS(main, true);
-				main.closeDialog();
+				main.removeWindow(dialog);
 
 			}
 			
 		});
-		buttons.addComponent(ok);
-
-		makeDialog(main, "450px", "380px", "Lis‰‰ n‰kym‰", "Peruuta", content, buttons);
-		
-	}
-
-	public static void makeDialog(final Main main, String caption, String back, Component content_, HorizontalLayout buttons) {
-		makeDialog(main, main.dialogWidth(), main.dialogHeight(), caption, back, content_, buttons);
-	}
-
-	public static void makeDialog(final Main main, String w, String h, String caption, String back, Component content_, HorizontalLayout buttons) {
-
-		if(buttons == null) {
-			buttons = new HorizontalLayout();
-	        buttons.setSpacing(true);
-	        buttons.setMargin(true);
-		}
-		
-		if(back != null) {
-	        Button close = new Button(back, new Button.ClickListener() {
-	        	
-				private static final long serialVersionUID = 1992235622970234624L;
-	
-	            public void buttonClick(ClickEvent event) {
-	    			main.closeDialog();
-	            }
-	            
-	        });
-	        buttons.addComponent(close);
-		}
-		
-        final Window subwindow = new Window(caption, new VerticalLayout());
-        subwindow.setModal(true);
-        subwindow.setWidth(w);
-        subwindow.setHeight(h);
-        subwindow.setResizable(true);
-        
-        final VerticalLayout winLayout = (VerticalLayout) subwindow.getContent();
-        winLayout.setMargin(true);
-        winLayout.setSpacing(true);
-        winLayout.setSizeFull();
-        
-        Panel content = new Panel();
-        content.setSizeFull();
-        content.addStyleName(ValoTheme.PANEL_BORDERLESS);
-        content.addStyleName(ValoTheme.PANEL_SCROLL_INDICATOR);
-        content.setContent(content_);
-        
-        winLayout.addComponent(content);
-        winLayout.setExpandRatio(content, 1.0f);
-        winLayout.setComponentAlignment(content, Alignment.BOTTOM_CENTER);
-
-        winLayout.addComponent(buttons);
-        winLayout.setExpandRatio(buttons, 0.0f);
-        winLayout.setComponentAlignment(buttons, Alignment.BOTTOM_CENTER);
-        
-        main.closeDialog();
-
-		main.addWindow(subwindow);
-
-		main.modalDialog = subwindow;
-		
-	}
-
-	public static void errorDialog(final Main main, String caption, Component content_) {
-
-		HorizontalLayout buttons = new HorizontalLayout();
-		buttons.setSpacing(true);
-		
-        final Window subwindow = new Window(caption, new VerticalLayout());
-        subwindow.setModal(true);
-        subwindow.setWidth(main.dialogWidth());
-        subwindow.setHeight(main.dialogHeight());
-        subwindow.setResizable(false);
-
-		Button close = new Button("Jatka", new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = 1992235622970234624L;
-
-            public void buttonClick(ClickEvent event) {
-    			main.removeWindow(subwindow);
-            }
-            
-        });
-        
-        buttons.addComponent(close);
-		
-        final VerticalLayout winLayout = (VerticalLayout) subwindow.getContent();
-        winLayout.setMargin(true);
-        winLayout.setSpacing(true);
-        winLayout.setSizeFull();
-        
-        Panel content = new Panel();
-        content.addStyleName(ValoTheme.PANEL_BORDERLESS);
-        content.setSizeFull();
-        
-        content.setContent(content_);
-        
-        winLayout.addComponent(content);
-        winLayout.setExpandRatio(content, 1.0f);
-        winLayout.setComponentAlignment(content, Alignment.BOTTOM_CENTER);
-
-        winLayout.addComponent(buttons);
-        winLayout.setExpandRatio(buttons, 0.0f);
-        winLayout.setComponentAlignment(buttons, Alignment.BOTTOM_CENTER);
-        
-        main.closeDialog();
-
-		main.addWindow(subwindow);
-		
-	}
-
-	public static void confirmDialog(final Main main, String text, String ok, String cancel, final Runnable runnable) {
-
-		HorizontalLayout buttons = new HorizontalLayout();
-		buttons.setSpacing(true);
-		
-        final Window subwindow = new Window("Vahvistus", new VerticalLayout());
-        subwindow.setModal(true);
-        subwindow.setWidth("550px");
-        subwindow.setHeight("150px");
-        subwindow.setResizable(true);
-
-		Button okButton = new Button(ok, new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = -1059166655868073563L;
-
-            public void buttonClick(ClickEvent event) {
-    			main.removeWindow(subwindow);
-    			runnable.run();
-            }
-            
-        });
-        
-		Button cancelButton = new Button(cancel, new Button.ClickListener() {
-			
-			private static final long serialVersionUID = -5227602164819268383L;
-
-            public void buttonClick(ClickEvent event) {
-    			main.removeWindow(subwindow);
-            }
-            
-        });
-
-		buttons.addComponent(okButton);
-		buttons.addComponent(cancelButton);
-		
-        final VerticalLayout winLayout = (VerticalLayout) subwindow.getContent();
-        winLayout.setMargin(true);
-        winLayout.setSpacing(true);
-        winLayout.setSizeFull();
-        
-        Label l = new Label(text);
-        winLayout.addComponent(l);
-        
-        winLayout.addComponent(buttons);
-        winLayout.setExpandRatio(buttons, 0.0f);
-        winLayout.setComponentAlignment(buttons, Alignment.BOTTOM_CENTER);
-        
-        main.closeDialog();
-
-		main.addWindow(subwindow);
-		
-	}
-
-	public static void infoDialog(final Main main, String caption, String text, final Runnable runnable) {
-
-		HorizontalLayout buttons = new HorizontalLayout();
-		buttons.setSpacing(true);
-		
-        final Window subwindow = new Window(caption, new VerticalLayout());
-        subwindow.setModal(true);
-        subwindow.setWidth("550px");
-        subwindow.setHeight("150px");
-        subwindow.setResizable(false);
-        
-		Button okButton = new Button("Jatka", new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = -1059166655868073563L;
-
-            public void buttonClick(ClickEvent event) {
-    			main.removeWindow(subwindow);
-    			if(runnable != null)
-    				runnable.run();
-            }
-            
-        });
-
-		buttons.addComponent(okButton);
-		
-        final VerticalLayout winLayout = (VerticalLayout) subwindow.getContent();
-        winLayout.setMargin(true);
-        winLayout.setSpacing(true);
-        winLayout.setSizeFull();
-        
-        Label l = new Label(text);
-        l.addStyleName(ValoTheme.LABEL_LARGE);
-        winLayout.addComponent(l);
-        
-        winLayout.addComponent(buttons);
-        winLayout.setExpandRatio(buttons, 0.0f);
-        winLayout.setComponentAlignment(buttons, Alignment.BOTTOM_CENTER);
-        
-        main.closeDialog();
-
-		main.addWindow(subwindow);
 		
 	}
 
@@ -1810,83 +1365,6 @@ public class Utils {
 		
 	}
 	
-	public static void commentDialog(final Main main, String caption, String okCaption, String nullCaption, final CommentCallback runnable) {
-
-        final Window subwindow = new Window(caption, new VerticalLayout());
-        subwindow.setModal(true);
-        subwindow.setWidth("550px");
-        subwindow.setHeight("450px");
-        
-        final VerticalLayout winLayout = (VerticalLayout) subwindow.getContent();
-        winLayout.setMargin(true);
-        winLayout.setSpacing(true);
-        winLayout.setSizeFull();
-        
-        final TextField s = new TextField("");
-        s.setCaption("Anna lyhyt m‰‰re n‰ytett‰v‰ksi arvon yhteydess‰");
-        s.addStyleName(ValoTheme.TEXTFIELD_TINY);
-        s.setWidth("100%");
-        winLayout.addComponent(s);
-        winLayout.setExpandRatio(s, 0.0f);
-        
-        final TextArea l = new TextArea("");
-        l.setCaption("Anna vapaamuotoinen kuvaus p‰ivitykseen liittyen");
-        l.addStyleName(ValoTheme.TEXTAREA_TINY);
-        l.setSizeFull();
-        winLayout.addComponent(l);
-        winLayout.setExpandRatio(l, 1.0f);
-
-		Button okButton = new Button(okCaption, new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = -1059166655868073563L;
-
-            public void buttonClick(ClickEvent event) {
-            	String shortComment = s.getValue();
-            	String comment = l.getValue();
-    			main.removeWindow(subwindow);
-    			if(runnable != null)
-    				runnable.runWithComment(shortComment, comment);
-            }
-            
-        });
-
-		Button nullButton = new Button(nullCaption, new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = -1059166655868073563L;
-
-            public void buttonClick(ClickEvent event) {
-    			main.removeWindow(subwindow);
-    			if(runnable != null)
-    				runnable.runWithComment(null, null);
-            }
-            
-        });
-
-		Button cancelButton = new Button("Peruuta", new Button.ClickListener() {
-        	
-			private static final long serialVersionUID = -1059166655868073563L;
-
-            public void buttonClick(ClickEvent event) {
-    			main.removeWindow(subwindow);
-            }
-            
-        });
-
-		HorizontalLayout buttons = new HorizontalLayout();
-		buttons.setSpacing(true);
-		
-		buttons.addComponent(okButton);
-		buttons.addComponent(nullButton);
-		buttons.addComponent(cancelButton);
-        
-        winLayout.addComponent(buttons);
-        winLayout.setExpandRatio(buttons, 0.0f);
-        winLayout.setComponentAlignment(buttons, Alignment.BOTTOM_CENTER);
-        
-		main.addWindow(subwindow);
-		
-	}
-
 	public static void editTextAndId(final Main main, String title, final Base container) {
 		
 		final Database database = main.getDatabase();
@@ -1917,15 +1395,15 @@ public class Utils {
 
         Button save = new Button("Tallenna", new Button.ClickListener() {
         	
-			private static final long serialVersionUID = 1L;
+			private static final long serialVersionUID = 6641880870005364983L;
 
-            public void buttonClick(ClickEvent event) {
+			public void buttonClick(ClickEvent event) {
             	String idValue = tf.getValue();
             	String value = ta.getValue();
             	main.removeWindow(subwindow);
             	container.modifyId(main, idValue);
             	container.modifyText(main, value);
-            	Collection<String> tags = Utils.extractTags(value);
+            	Collection<String> tags = Tag.extractTags(value);
             	database.assertTags(tags);
             	ArrayList<Tag> tagObjects = new ArrayList<Tag>();
             	for(String s : tags)
@@ -2031,7 +1509,7 @@ public class Utils {
 		
 		private static final long serialVersionUID = 5930055496801663683L;
 		
-		private String customFilterString;
+		String customFilterString;
 		
 		@Override
 		public void changeVariables(Object source, Map<String, Object> variables) {
@@ -2041,73 +1519,6 @@ public class Utils {
 		
 	}
 	
-	static class CustomLazyContainer extends IndexedContainer {
-		
-		private static final long serialVersionUID = -4520139213434183947L;
-		
-		private Database database;
-		private String filterString;
-		private TagCombo combo;
-		
-		final private List<Tag> tags;
-
-		public CustomLazyContainer(Database database, TagCombo combo, List<Tag> tags) {
-			this.database = database;
-			this.tags = tags;
-			this.combo = combo;
-			addContainerProperty("id", String.class, "");
-			doFilter();
-		}
-		
-		public String getFilterString() {
-			return filterString;
-		}
-
-		@Override
-		public void addContainerFilter(Filter filter) throws UnsupportedFilterException {
-			if (filter == null)
-			{
-				removeAllItems();
-				filterString = null;
-				return;
-			}
-
-			removeAllItems();
-
-			if (filter instanceof SimpleStringFilter)
-			{
-				String newFilterString = combo.customFilterString;
-
-				if (newFilterString == null)
-					return;
-
-				if (newFilterString.equals(filterString))
-					return;
-
-				filterString = newFilterString;
-
-				if (filterString.length() < 1)
-					return;
-
-				doFilter();
-				super.addContainerFilter(filter);
-			}
-		}
-
-		@SuppressWarnings("unchecked")
-		private void doFilter() {
-			for(Tag t : tags) {
-				Item item = addItem(t.getId(database));
-				item.getItemProperty("id").setValue(t.getId(database));
-			}
-			if(filterString != null) {
-				Item item = addItem(filterString);
-				item.getItemProperty("id").setValue(filterString);
-			}
-		}
-
-	}
-
 	public static void editTags(final Main main, String title, final Base container) {
 		
 		final Database database = main.getDatabase();
@@ -2219,740 +1630,20 @@ public class Utils {
 		}			
 	}
 	
-	public abstract static class Action implements Runnable {
-		
-		public String caption;
-		
-		public Action(String caption) {
-			this.caption = caption;
-		}
-		
-		public boolean accept() {
-			return true;
-		}
 
-		
+	
+
+	
+	
+
+	public static Base getPossibleImplemented(Database db, Base b) {
+		Relation implementsRelation = Relation.find(db, Relation.IMPLEMENTS);
+	   	Pair p = implementsRelation.getPossibleRelation(b);
+	   	if(p != null) {
+	   		return db.find(p.second);
+	   	}
+	   	return null;
 	}
-	
-	private static String formatPageName(String pageName) {
-		String formatted = pageName.replaceAll(" ", "_").replaceAll("\\.", "_"); 
-		return formatted;
-	}
-	
-	public static String makeTavoitePageName(Database database, Strategiakartta map, Tavoite base) {
-
-		String pageName = Main.wikiPrefix;
-		
-		if(map != null) pageName += map.getId(database) + "_";
-
-		pageName += base.getId(database);
-		
-		return formatPageName(pageName);
-
-	}
-	
-	public static String makeWikiPageName(Database database, Base base) {
-
-		String pageName = Main.wikiPrefix;
-		
-		if(base instanceof Strategiakartta) {
-			
-			pageName += base.getId(database);
-			return formatPageName(pageName);
-			
-		} else if (base instanceof Tavoite) {
-
-			return makeTavoitePageName(database, database.getMap(base), (Tavoite)base);
-			
-		} else if (base instanceof Painopiste) {
-			
-			Painopiste p = (Painopiste)base;
-
-			Strategiakartta map = p.getMap(database);
-			if(map != null) pageName += map.getId(database) + "_";
-
-			Tavoite t = p.getGoal(database);
-			if(t != null) pageName += t.getId(database) + "_";
-
-			pageName += base.getId(database);
-			return formatPageName(pageName);
-
-		} else {
-
-			Base owner = base.getOwner(database);
-			if(owner != null) {
-				pageName = makeWikiPageName(database, owner);
-				pageName += "_" + base.getText(database);
-				return formatPageName(pageName);
-			}
-			
-		}
-
-		return null;
-		
-	}
-	
-	public static void openWiki(Main main, Base base) {
-		
-		final Database database = main.getDatabase();
-
-		String pageName = makeWikiPageName(database, base);
-		if(pageName == null) return;
-
-		main.wiki.setSource(new ExternalResource("https://www.simupedia.com/strategiakartta/index.php/"+ pageName));
-		main.wikiPage = pageName;
-		main.wikiBase = base;
-
-		UIState s = main.uiState.duplicate(main);
-		main.setTabState(s, 2);
-		main.setFragment(s, true);
-
-	}
-	
-	public static void selectAction(final Main main, Double x, Double y, final Base container, final Base base) {
-
-		final Database database = main.getDatabase();
-
-		List<Action> actions = new ArrayList<Action>();
-		if(base instanceof Meter) return;
-		
-		Strategiakartta baseMap = database.getMap(base);
-		boolean generated = !baseMap.generators.isEmpty();
-
-		if(!generated) {
-			
-			actions.add(new Action("Strategian toteutus") {
-	
-				@Override
-				public void run() {
-	
-					main.getUIState().level = 3;
-					main.getUIState().setCurrentFilter(new TulostavoiteToimenpideFilter(main, base, database.getMap(base)));
-					
-					main.setCurrentItem(base, database.getMap(base));
-					main.switchToBrowser();
-					
-				}
-				
-			});
-		
-			actions.add(new Action("Valmiusasteet") {
-	
-				@Override
-				public void run() {
-					
-					Strategiakartta map = database.getMap(base);
-					main.getUIState().currentPosition = map;
-	
-					main.getUIState().setCurrentFilter(new MeterFilter(main, base, main.getUIState().currentPosition));
-					if(base instanceof Tavoite) {
-						main.getUIState().level = 4;
-						main.less.setEnabled(true);
-					} else {
-						main.getUIState().level = 2;
-						main.less.setEnabled(false);
-					}
-					
-					main.setCurrentItem(base, main.getUIState().currentPosition);
-					main.switchToBrowser();
-	
-				}
-				
-			});
-
-			actions.add(new Action("Tulostavoitteet") {
-				
-				@Override
-				public void run() {
-					
-					Strategiakartta map = database.getMap(base);
-					main.getUIState().currentPosition = map;
-	
-					main.getUIState().setCurrentFilter(new TulostavoiteFilter(main, base, main.getUIState().currentPosition));
-					main.getUIState().level = 10;
-					
-					main.setCurrentItem(base, main.getUIState().currentPosition);
-					main.switchToBrowser();
-	
-				}
-				
-			});
-			
-			actions.add(new Action("Tausta-asiakirja") {
-	
-				@Override
-				public void run() {
-	
-					openWiki(main, base);
-					
-				}
-				
-			});
-	
-			actions.add(new Action("Ominaisuudet") {
-	
-				@Override
-				public void run() {
-					
-					main.setCurrentItem(base, main.getUIState().currentPosition);
-					main.switchToProperties();
-					
-				}
-				
-			});
-			
-		}
-		
-		if(main.getUIState().tabState != 0) {
-			actions.add(new Action("Avaa strategiakartassa") {
-
-				@Override
-				public void run() {
-
-					Strategiakartta map = database.getMap(base);
-					
-					main.getUIState().current = map;
-					Updates.updateJS(main, false);
-					main.switchToMap();
-					
-				}
-				
-			});
-		}
-
-		if(base instanceof Tavoite) {
-			
-			Tavoite goal = (Tavoite)base;
-
-			if(!generated) {
-				actions.add(new Action("Voimavarat") {
-	
-					@Override
-					public void run() {
-						
-						openWiki(main, base);
-						
-					}
-					
-				});
-			}
-			
-			final Strategiakartta map = database.getMap(base);
-			final String desc = goal.getFocusDescription(database);
-
-			if(Account.canWrite(main, base) && !generated) {
-
-				actions.add(new Action("Lis‰‰ " + desc.toLowerCase()) {
-
-					@Override
-					public void run() {
-						
-						ObjectType ppType = getFocusType(database, map);
-						boolean manyImplements = getManyImplements(database, ppType);
-						
-						if(manyImplements) {
-
-							Utils.selectFocusType(main, map, (Tavoite)base, desc, new GoalCallback() {
-								
-								@Override
-								public void selected(String uuid) {
-
-									if(uuid != null) {
-										Painopiste exist = database.find(uuid);
-										Tavoite t = (Tavoite)base;
-										t.add(database, exist);
-									} else {
-										Painopiste.create(database, map, (Tavoite)base, "Uusi " + desc);
-									}
-									Updates.updateJS(main, true);
-									
-								}
-								
-							});
-							
-						} else {
-
-							Painopiste.create(database, map, (Tavoite)base, "Uusi " + desc);
-							Updates.updateJS(main, true);
-
-						}
-
-					}
-					
-				});
-
-				
-				MoveUp moveUp = new MoveUp(main, (Tavoite)base);
-				if(moveUp.accept()) actions.add(moveUp);
-				MoveDown moveDown = new MoveDown(main, (Tavoite)base);
-				if(moveDown.accept()) actions.add(moveDown);
-				
-				actions.add(new Action("Poista") {
-					
-					@Override
-					public void run() {
-
-						Tavoite t = (Tavoite)base;
-						if(t.painopisteet.length > 0) {
-
-							VerticalLayout la = new VerticalLayout();
-							Label l = new Label("Vain tyhj‰n m‰‰rityksen voi poistaa. Poista ensin jokainen " + desc.toLowerCase() +  " ja yrit‰ sen j‰lkeen uudestaan.");
-							l.addStyleName(ValoTheme.LABEL_H3);
-							la.addComponent(l);
-							Utils.errorDialog(main, "Poisto estetty", la);
-							return;
-							
-						}
-						
-						Utils.confirmDialog(main, "Haluatko varmasti poistaa m‰‰rityksen " + base.getId(database) + " ?", "Poista", "Peruuta", new Runnable() {
-
-							@Override
-							public void run() {
-								
-								Tavoite t = (Tavoite)base;
-								t.remove(database);
-								map.fixRows();
-								Updates.updateJS(main, true);
-							}
-							
-						});
-
-					}
-
-				});
-
-			}
-			
-		}
-		
-		if(base instanceof Painopiste) {
-			
-			if(Account.canWrite(main, base) && !generated) {
-
-				actions.add(new Action("M‰‰rit‰ toteuttavat organisaatiot") {
-
-					@Override
-					public void run() {
-						
-						Utils.defineImplementors(main,base);					
-						
-					}
-					
-				});
-
-				final Tavoite t = database.getTavoite((Painopiste)base);
-				int pos = t.findPainopiste((Painopiste)base);
-				if(pos > 0) {
-					actions.add(new Action("Siirr‰ ylemm‰s") {
-	
-						@Override
-						public void run() {
-	
-							t.moveUp((Painopiste)base);
-							Updates.updateJS(main, true);
-	
-						}
-	
-					});
-				}
-				if(pos < t.painopisteet.length - 1) {
-					actions.add(new Action("Siirr‰ alemmas") {
-	
-						@Override
-						public void run() {
-	
-							t.moveDown((Painopiste)base);
-							Updates.updateJS(main, true);
-	
-						}
-	
-					});
-				}
-
-				if(container != null) {
-				
-					actions.add(new Action("Poista") {
-						
-						@Override
-						public void run() {
-	
-							Relation implementsRelation = Relation.find(database, Relation.IMPLEMENTS);
-							Collection<Base> implementors = database.getInverse(base, implementsRelation);
-							if(!implementors.isEmpty()) {
-	
-								VerticalLayout la = new VerticalLayout();
-								Label l = new Label("Poista ensin t‰h‰n viittaavat m‰‰ritykset:");
-								l.addStyleName(ValoTheme.LABEL_H3);
-								la.addComponent(l);
-								for(Base b : implementors) {
-									Strategiakartta map = database.getMap(b);
-									Label l2 = new Label("&nbsp;&nbsp;&nbsp;&nbsp;" + b.getId(database) + " - " + b.getText(database) + " (" + map.getId(database) + ")");
-									l2.setContentMode(ContentMode.HTML);
-									la.addComponent(l2);
-								}
-								Utils.errorDialog(main, "M‰‰ritys on k‰ytˆss‰, eik‰ sit‰ voida poistaa", la);
-								return;
-								
-							}
-							
-							Utils.confirmDialog(main, "Haluatko varmasti poistaa m‰‰rityksen " + base.getId(database) + " ?", "Poista", "Peruuta", new Runnable() {
-	
-								@Override
-								public void run() {
-									
-									Strategiakartta map = database.getMap(base);
-									Painopiste p = (Painopiste)base;
-									
-									int refs = 0;
-									for(Tavoite t : map.tavoitteet) {
-										for(Painopiste p2 : t.painopisteet) {
-											if(p2.equals(base)) refs++;
-										}
-									}
-									
-									Tavoite t = (Tavoite)container;
-									if(refs == 1) p.remove(database);
-									else t.removePainopiste(database, p);
-									map.fixRows();
-									Updates.updateJS(main, true);
-									
-								}
-								
-							});
-	
-						}
-	
-					});
-					
-				}
-				
-			}
-			
-		}
-
-		if(base instanceof Strategiakartta) {
-			
-			final Strategiakartta map = (Strategiakartta)base;
-			if(!map.generators.isEmpty()) {
-
-				actions.add(new Action("P‰ivit‰ n‰kym‰") {
-
-					@Override
-					public void run() {
-						
-						map.generate(main);
-						Updates.updateJS(main, false);
-						
-					}
-					
-				});
-
-			}
-			
-			if(Account.canWrite(main, base) && !generated) {
-				
-				actions.add(new Action("Lis‰‰ " + map.tavoiteDescription.toLowerCase()) {
-
-					@Override
-					public void run() {
-						
-						Utils.selectGoalType(main, map, new GoalCallback() {
-							
-							@Override
-							public void selected(String uuid) {
-								if(uuid != null) {
-									Base copy = database.find(uuid);
-									Tavoite.createCopy(database, main.uiState.current, copy);
-								} else {
-									Tavoite.create(database, main.uiState.current, "Oma " + map.ownGoalDescription.toLowerCase());
-								}
-								Updates.updateJS(main, true);
-							}
-							
-						});
-						
-					}
-					
-				});
-
-				actions.add(new Action("Lis‰‰ aliorganisaatio") {
-
-					@Override
-					public void run() {
-						
-						Utils.addMap(main, (Strategiakartta)base);
-						
-					}
-					
-				});
-
-				actions.add(new Action("Lis‰‰ n‰kym‰") {
-
-					@Override
-					public void run() {
-						
-						Utils.addView(main, (Strategiakartta)base);
-						
-					}
-					
-				});
-				
-			}
-			
-			if(Account.canWrite(main, base)) {
-
-				actions.add(new Action("Poista") {
-					
-					@Override
-					public void run() {
-
-						if(map.tavoitteet.length > 0 && map.generators.isEmpty()) {
-
-							VerticalLayout la = new VerticalLayout();
-							Label l = new Label("Vain tyhj‰n kartan voi poistaa. Poista ensin jokainen " + map.tavoiteDescription.toLowerCase() +  " ja yrit‰ sen j‰lkeen uudestaan.");
-							l.addStyleName(ValoTheme.LABEL_H3);
-							la.addComponent(l);
-							Utils.errorDialog(main, "Poisto estetty", la);
-							return;
-							
-						}
-						
-						Utils.confirmDialog(main, "Haluatko varmasti poistaa kartan " + base.getId(database) + " ?", "Poista", "Peruuta", new Runnable() {
-
-							@Override
-							public void run() {
-								
-								Strategiakartta parent = map.getPossibleParent(database);
-								database.remove(map);
-								if(parent != null)
-									main.getUIState().current = parent;
-								
-								Updates.updateJS(main, true);
-							}
-							
-						});
-
-					}
-
-				});
-				
-				
-			}
-			
-			if(main.getUIState().tabState == 1) {
-				
-				actions.add(new Action("Rajaa tarkastelu t‰m‰n alle") {
-	
-					@Override
-					public void run() {
-						main.setCurrentItem(main.getUIState().currentItem, (Strategiakartta)base);
-					}
-					
-				});
-				
-			}
-
-		}
-		
-		if(main.getUIState().showTags) {
-			
-			actions.add(new Action("Piilota aihetunnisteet") {
-				
-				@Override
-				public void run() {
-
-					UIState s = main.getUIState().duplicate(main);
-					s.showTags = false;
-					main.setFragment(s, true);
-
-				}
-				
-			});
-
-			if(base instanceof Strategiakartta) {
-
-				actions.add(new Action("Valitse aihetunnisteet") {
-
-					@Override
-					public void run() {
-
-						Utils.selectMonitorTagsDialog(main, (Strategiakartta)base, new DialogCallback<Collection<Tag>>() {
-
-							@Override
-							public void finished(Collection<Tag> result) {
-
-								UIState s = main.getUIState().duplicate(main);
-								s.shownTags = new ArrayList<Tag>(result);
-								main.setFragment(s, true);
-
-								Updates.update(main, true);
-
-							}
-
-							@Override
-							public void canceled() {
-							}
-
-						});
-
-					}
-
-				});
-
-			}
-			
-		} else {
-			
-			actions.add(new Action("N‰yt‰ aihetunnisteet") {
-				
-				@Override
-				public void run() {
-					
-					UIState s = main.getUIState().duplicate(main);
-					s.showTags = true;
-					main.setFragment(s, true);
-					
-				}
-				
-			});
-			
-		}
-		
-		if(main.getUIState().showMeters) {
-			
-			actions.add(new Action("Piilota mittarit") {
-				
-				@Override
-				public void run() {
-
-					UIState s = main.getUIState().duplicate(main);
-					s.showMeters = false;
-					main.setFragment(s, true);
-
-				}
-				
-			});
-
-			
-		} else {
-			
-			actions.add(new Action("N‰yt‰ mittarit") {
-				
-				@Override
-				public void run() {
-					
-					UIState s = main.getUIState().duplicate(main);
-					s.showMeters = true;
-					main.setFragment(s, true);
-					
-				}
-				
-			});
-			
-		}
-
-		if(main.getUIState().showVoimavarat) {
-			
-			actions.add(new Action("Piilota voimavarat") {
-				
-				@Override
-				public void run() {
-
-					UIState s = main.getUIState().duplicate(main);
-					s.showVoimavarat = false;
-					main.setFragment(s, true);
-
-				}
-				
-			});
-
-			
-		} else {
-			
-			actions.add(new Action("N‰yt‰ voimavarat") {
-				
-				@Override
-				public void run() {
-					
-					UIState s = main.getUIState().duplicate(main);
-					s.showVoimavarat = true;
-					main.setFragment(s, true);
-					
-				}
-				
-			});
-			
-		}
-		
-		Action cancel = new Action("Peruuta") {
-
-			@Override
-			public void run() {
-				
-			}
-			
-		}; 
-		
-		actions.add(cancel);
-		
-		if(actions.size() == 0) return;
-		if(actions.size() == 1) {
-			actions.get(0).run();
-			return;
-		}
-		
-		VerticalLayout menu = new VerticalLayout();
-		final PopupView openerButton = new PopupView("", menu);
-		
-		menu.setWidth("500px");
-		
-		Label header = new Label(base.getId(database));
-		header.addStyleName(ValoTheme.LABEL_HUGE);
-		header.setSizeUndefined();
-		menu.addComponent(header);
-		menu.setComponentAlignment(header, Alignment.MIDDLE_CENTER);
-
-		Label header2 = new Label("valitse toiminto");
-		header2.addStyleName(ValoTheme.LABEL_LIGHT);
-		header2.addStyleName(ValoTheme.LABEL_SMALL);
-		header2.setSizeUndefined();
-		menu.addComponent(header2);
-		menu.setComponentAlignment(header2, Alignment.MIDDLE_CENTER);
-
-		for(Action a : actions)
-			addAction(main, openerButton, menu, a.caption, a);
-		
-		openerButton.setHideOnMouseOut(false);
-		openerButton.setPopupVisible(true);
-		
-		main.abs.addComponent(openerButton, "left: " + x.intValue() + "px; top: " + y.intValue() + "px");
-
-	}
-	
-	private static void addAction(final Main main, final PopupView openerButton, final VerticalLayout menu, String caption, final Action r) {
-
-		Button b1 = new Button(caption);
-		b1.addStyleName(ValoTheme.BUTTON_QUIET);
-		b1.addStyleName(ValoTheme.BUTTON_LARGE);
-		b1.setWidth("100%");
-		b1.addClickListener(new ClickListener() {
-			
-			private static final long serialVersionUID = 7150528981216406326L;
-
-			@Override
-			public void buttonClick(ClickEvent event) {
-				r.run();
-				main.abs.removeComponent(openerButton);
-			}
-			
-		});
-		if("Peruuta".equals(caption)) {
-			b1.setClickShortcut(KeyCode.ESC);
-		}
-		menu.addComponent(b1);
-
-	}
-	
 
 	public static boolean doesImplement(Database db, Base b, Base target) {
 		return doesImplement(db, b, target, new HashMap<Base, Boolean>());
@@ -2985,19 +1676,12 @@ public class Utils {
 		return result;
 	}
 	
-	public static boolean getManyImplements(Database database, ObjectType type) {
-
-		Property p = Property.find(database, Property.MANY_IMPLEMENTS);
-		return Boolean.parseBoolean(p.getPropertyValue(type));
-
-	}
-	
-	public static boolean getManyImplementor(Database database, ObjectType type) {
-
-		Property p = Property.find(database, Property.MANY_IMPLEMENTOR);
-		return Boolean.parseBoolean(p.getPropertyValue(type));
-
-	}
+//	public static boolean getManyImplementor(Database database, ObjectType type) {
+//
+//		Property p = Property.find(database, Property.MANY_IMPLEMENTOR);
+//		return Boolean.parseBoolean(p.getPropertyValue(type));
+//
+//	}
 
 	public static ObjectType getOwnGoalType(Database database, Strategiakartta map) {
 		
@@ -3023,18 +1707,6 @@ public class Utils {
 
 	}
 
-	public static ObjectType getFocusType(Database database, Strategiakartta map) {
-		
-		Property levelProperty = Property.find(database, Property.LEVEL);
-		ObjectType level = database.find((String)levelProperty.getPropertyValue(map));
-		
-		Property focusTypeProperty = Property.find(database, Property.FOCUS_TYPE);
-		String focusTypeUUID = focusTypeProperty.getPropertyValue(level);
-		
-		return database.find(focusTypeUUID);
-
-	}
-	
 	public static String describeDate(Date d) {
 		return describeDate(new Date(), d);
 	}
@@ -3080,6 +1752,11 @@ public class Utils {
 		Collection<Base> imp = b.getRelatedObjects(database, implementsRelation);
 		if(imp.isEmpty()) return Collections.emptySet();
 		Set<Base> result = new TreeSet<Base>();
+		
+		if(b instanceof Painopiste) {
+			result.add(((Painopiste)b).getGoal(database));
+		}
+		
 		for(Base b2 : imp) {
 			result.add(b2);
 			Set<Base> bs = getImplementationSet(database, b2);
@@ -3089,7 +1766,47 @@ public class Utils {
 	}
 	
 	public static Collection<Base> getDirectImplementors(Database database, Base b) {
-		return database.getInverse(b, Relation.find(database, Relation.IMPLEMENTS));
+		return getDirectImplementors(database, b, Property.AIKAVALI_KAIKKI);
+	}
+
+	public static Collection<Base> getDirectImplementors(Database database, Base b, String requiredValidityPeriod) {
+		return getDirectImplementors(database, b, true, requiredValidityPeriod);
+	}
+
+	public static Collection<Base> getDirectImplementors(Database database, Base b, boolean filterMaps, String requiredValidityPeriod) {
+		
+		ArrayList<Base> implementors = new ArrayList<Base>(database.getInverse(b, Relation.find(database, Relation.IMPLEMENTS)));
+		Collections.sort(implementors);
+		
+		if(implementors.isEmpty()) return Collections.emptyList();
+
+		TreeMap<Double,Base> sorting = new TreeMap<Double,Base>();
+
+		Strategiakartta map = database.getMap(b);
+		
+		Property aika = Property.find(database, Property.AIKAVALI);
+
+		for(int i=0;i<implementors.size();i++) {
+			
+			Base b2 = implementors.get(i);
+			if(filterMaps && b2 instanceof Strategiakartta) continue;
+			
+			String a = aika.getPropertyValue(b2);
+			if(Utils.acceptTime(a, requiredValidityPeriod)) {
+				Strategiakartta child = database.getMap(b2);
+				double key = 1.0 / Double.valueOf(i+1);
+				for(int j=0;j<map.alikartat.length;j++) {
+					Linkki l = map.alikartat[j];
+					if(l.uuid.equals(child.uuid))
+						key = j+2;
+				}
+				sorting.put(key, b2);
+			}
+			
+		}
+		
+		return sorting.values();
+		
 	}
 	
 	public static List<String> excelRow(String ... cells) {
@@ -3110,5 +1827,150 @@ public class Utils {
 		return "Strategiakartta_" + day + "_" + month + "_" + year + "__" + hours + "_" + minutes + "_" + seconds;
 	}
 
+	public static String hexI(int i) {
+		if(i < 10) return "" + i;
+		else {
+			char offset = (char) (i-10);
+			char c = (char) ('A' + offset);
+			return "" + c;
+		}
+	}
+	
+	public static String hex(double value) {
+		int i = (int)value;
+		int upper = i >> 4;
+		int lower = i & 15;
+		return hexI(upper) + hexI(lower);
+	}
+
+	public static String trafficColor(double value) {
+		
+		double redR = 218.0;
+		double redG = 37.0;
+		double redB = 29.0;
+		
+		double yellowR = 244.0;
+		double yellowG = 192.0;
+		double yellowB = 0.0;
+
+		double greenR = 0.0;
+		double greenG = 146.0;
+		double greenB = 63.0;
+		
+		if(value < 0.5) {
+			double r = (1-2.0*value)*redR + (2.0*value)*yellowR;
+			double g = (1-2.0*value)*redG + (2.0*value)*yellowG;
+			double b = (1-2.0*value)*redB + (2.0*value)*yellowB;
+			return "#" + hex(r) + hex(g) + hex(b);
+		} else {
+			double r = (2.0*value - 1)*greenR + (2 - 2.0*value)*yellowR;
+			double g = (2.0*value - 1)*greenG + (2 - 2.0*value)*yellowG;
+			double b = (2.0*value - 1)*greenB + (2 - 2.0*value)*yellowB;
+			return "#" + hex(r) + hex(g) + hex(b);
+		}
+		
+	}
+	
+	public static String printPath(Database database, Base b) {
+		StringBuilder result = new StringBuilder();
+		Strategiakartta map = b.getMap(database);
+		result.append(b.getText(database));
+		Strategiakartta parent = map.getPossibleParent(database);
+		while(parent != null) {
+			result.append(" / ");
+			result.append(parent.getText(database));
+			parent = parent.getPossibleParent(database);
+		}
+		return result.toString();
+		
+	}
+	
+	public static boolean acceptTime(String itemValidityPeriod, String requiredValidityPeriod) {
+
+		if (Property.AIKAVALI_KAIKKI.equals(requiredValidityPeriod))
+			return true;
+
+		TimeInterval itemInterval = TimeInterval.parse(itemValidityPeriod);
+		TimeInterval requiredInterval = TimeInterval.parse(requiredValidityPeriod);
+		
+		return itemInterval.intersects(requiredInterval);
+
+	}
+	
+	public static Set<String> getResponsibilityFields(Database database, Base b) {
+		
+		Set<String> result = new TreeSet<String>();
+		buildResponsibilityFieldsInternal(database, b, result);
+		return result;
+
+	}
+
+	private static void buildResponsibilityFieldsInternal(Database database, Base b, Set<String> result) {
+		
+		Strategiakartta map = database.getMap(b);
+		
+		Base currentLevel = map.currentLevel(database);
+
+		Relation modelRelation =  Relation.find(database, Relation.RESPONSIBILITY_MODEL);
+		ResponsibilityModel model = modelRelation.getPossibleRelationObject(database, currentLevel);
+		if(model != null) {
+			List<String> fields = model.getFields();
+			result.addAll(fields);
+		}
+		
+		Base implemented = Utils.getPossibleImplemented(database, b);
+		if(implemented != null)
+			buildResponsibilityFieldsInternal(database, implemented, result);
+		
+	}
+
+	public static Map<String,String> getResponsibilityMap(Database database, Base b) {
+		
+		TreeMap<String,String> result = new TreeMap<String,String>();
+		buildResponsibilityMapInternal(database, b, result);
+		List<String> overrides = new ArrayList<String>();
+		for(Map.Entry<String, String> e : result.entrySet())
+			if("-".equals(e.getValue()))
+				overrides.add(e.getKey());
+		for(String override : overrides)
+			result.remove(override);
+		return result;
+
+	}
+
+	private static void buildResponsibilityMapInternal(Database database, Base b, Map<String,String> result) {
+		
+		Strategiakartta map = database.getMap(b);
+
+		Base currentLevel = map.currentLevel(database);
+		
+		Relation modelRelation =  Relation.find(database, Relation.RESPONSIBILITY_MODEL);
+		ResponsibilityModel model = modelRelation.getPossibleRelationObject(database, currentLevel);
+		if(model == null) return;
+		
+		Relation instanceRelation =  Relation.find(database, Relation.RESPONSIBILITY_INSTANCE);
+		ResponsibilityInstance instance = instanceRelation.getPossibleRelationObject(database, b);
+		ResponsibilityInstance defaultInstance = instanceRelation.getPossibleRelationObject(database, map);
+
+		Set<String> fields = getResponsibilityFields(database, b);
+		for(String field : fields) {
+			if(result.containsKey(field)) continue;
+			String value = null;
+			if(instance != null) {
+				value = instance.getValue(field);
+				if(value != null && !value.isEmpty())
+					result.put(field, value);
+			} else if(defaultInstance != null) {
+				value = defaultInstance.getValue(field);
+				if(value != null && !value.isEmpty())
+					result.put(field, value);
+			}
+		}
+		
+		Base implemented = Utils.getPossibleImplemented(database, b);
+		if(implemented != null)
+			buildResponsibilityMapInternal(database, implemented, result);
+		
+	}
 	
 }

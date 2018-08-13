@@ -46,21 +46,25 @@ import com.vaadin.ui.Table;
 import com.vaadin.ui.TextArea;
 import com.vaadin.ui.TextField;
 import com.vaadin.ui.VerticalLayout;
+import com.vaadin.ui.Window;
 import com.vaadin.ui.themes.ValoTheme;
 
+import fi.semantum.strategia.Dialogs;
 import fi.semantum.strategia.Lucene;
 import fi.semantum.strategia.Main;
 import fi.semantum.strategia.Updates;
 import fi.semantum.strategia.Utils;
 import fi.semantum.strategia.Utils.AbstractCommentCallback;
 import fi.semantum.strategia.Utils.CommentCallback;
+import fi.semantum.strategia.Wiki;
 
 public class Indicator extends Base {
-
+	
 	private static final long serialVersionUID = -5122160460824254403L;
 
 	private double value = 0;
 	public TimeSeries values;
+	
 	public String unit = "";
 	
 	public static Indicator create(Database database, String text, Datatype datatype) {
@@ -75,6 +79,11 @@ public class Indicator extends Base {
 		values = new TimeSeries(datatype);
 	}
 	
+	public Object getValue(boolean forecast) {
+		if(forecast) return getForecast();
+		else return getValue();
+	}
+	
 	public Object getValue() {
 		if(values != null) {
 			return values.getLastValue();
@@ -82,6 +91,13 @@ public class Indicator extends Base {
 		else return value;
 	}
 	
+	public Object getForecast() {
+		if(values != null) {
+			return values.getLastForecast();
+		}
+		else return value;
+	}
+
 	public String getValueShortComment() {
 		if(values != null) {
 			TimeSeriesEntry entry = values.getLastValueEntry();
@@ -110,22 +126,22 @@ public class Indicator extends Base {
 
 	}
 	
-	public void modifyValue(Main main, Base owner, Object value, String shortComment, String comment) {
+	public void update(Main main, Base owner, Object value, boolean forecast, String shortComment, String comment) {
 		
 		final Database database = main.getDatabase();
 
 		Account account = main.getAccountDefault();
-		if(!value.equals(this.getValue())) {
+		if(!value.equals(forecast ? getForecast() : getValue())) {
 			modified(main);
-			values.addValue(value, account, shortComment, comment);
+			values.addValue(forecast ? getValue() : value, forecast ? value : getForecast(), account, shortComment, comment);
 			try {
-				Lucene.set(uuid, searchText(database));
+				Lucene.set(database.getDatabaseId(), uuid, searchText(database));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
 	}
-	
+
 	private static class IndicatorDescription {
 		public String caption;
 		public Indicator indicator;
@@ -255,6 +271,7 @@ public class Indicator extends Base {
 				Collection<Indicator> selection = getSelection();
 				for(Indicator i : selection) {
 					Base owner = i.getOwner(database);
+					if(owner == null) continue;
 					owner.removeIndicator(i);
 				}
 
@@ -492,7 +509,7 @@ public class Indicator extends Base {
         buttons.setSpacing(true);
         buttons.setMargin(false);
         
-		Utils.makeDialog(main, "650px", "800px", "Hallitse indikaattoreita", "Sulje", content, buttons);
+        final Window dialog = Dialogs.makeDialog(main, "650px", "800px", "Hallitse indikaattoreita", "Sulje", content, buttons);
 
 	}
 
@@ -521,7 +538,7 @@ public class Indicator extends Base {
 
 	}
 	
-	public static Label makeHistory(Database database, Indicator indicator) {
+	public static Label makeHistory(Database database, Indicator indicator, boolean forecast) {
 		
 		Label ta2 = new Label("Historia");
         ta2.setContentMode(ContentMode.HTML);
@@ -538,11 +555,13 @@ public class Indicator extends Base {
         	String user = account != null ? account.getId(database) : "Järjestelmä";
         	sb.append("<b>");
         	sb.append(user);
-        	sb.append("</b> päivitti tietoa <b>");
+        	sb.append("</b> päivitti ");
+        	sb.append(forecast ? " ennustetta" : " toteumaa");
+        	sb.append(" <b>");
         	sb.append(Utils.describeDate(date));
         	sb.append("</b><br><hr>");
         	sb.append("&nbsp;Uusi arvo on <b>");
-        	sb.append(tse.getValue() + " " + indicator.getUnitAndComment());
+        	sb.append(forecast ? tse.getForecast() : tse.getValue() + " " + indicator.getUnitAndComment());
         	sb.append("</b><br>");
         	String comment = tse.getComment();
         	if(comment != null)
@@ -605,7 +624,7 @@ public class Indicator extends Base {
         content.setComponentAlignment(ta, Alignment.MIDDLE_CENTER);
         content.setExpandRatio(ta, 0.0f);
         
-        final Label ta2 = makeHistory(database, indicator);     
+        final Label ta2 = makeHistory(database, indicator, main.getUIState().forecastMeters);     
 		content.addComponent(ta2);
         content.setComponentAlignment(ta2, Alignment.MIDDLE_CENTER);
         content.setExpandRatio(ta2, 1.0f);
@@ -633,19 +652,20 @@ public class Indicator extends Base {
         });
         buttons.addComponent(ok);
 
-        Button close = new Button("Sulje", new Button.ClickListener() {
+        Button close = new Button("Sulje");
+        buttons.addComponent(close);
+        
+        final Window dialog = Dialogs.makeDialog(main, "650px", "800px", "Muokkaa indikaattoria", null, content, buttons);
+        close.addClickListener(new Button.ClickListener() {
         	
 			private static final long serialVersionUID = 1992235622970234624L;
 
             public void buttonClick(ClickEvent event) {
-    			main.closeDialog();
+    			main.removeWindow(dialog);
 				manageIndicators(main, main.getUIState().currentItem);
             }
             
         });
-        buttons.addComponent(close);
-        
-		Utils.makeDialog(main, "650px", "800px", "Muokkaa indikaattoria", null, content, buttons);
 
 	}
 	
@@ -664,7 +684,7 @@ public class Indicator extends Base {
 			modified(main);
 			this.unit = text;
 			try {
-				Lucene.set(uuid, searchText(database));
+				Lucene.set(database.getDatabaseId(), uuid, searchText(database));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -679,12 +699,13 @@ public class Indicator extends Base {
 		Datatype dt = indicator.getDatatype(database);
 		if(dt != null) {
 
-			final AbstractField<?> field = dt.getEditor(main, base, indicator);
+			final AbstractField<?> field = dt.getEditor(main, base, indicator, false, null);
 			field.setWidth("150px");
 			field.setReadOnly(!canWrite);
 			hl.addComponent(field);
 			hl.setComponentAlignment(field, Alignment.MIDDLE_LEFT);
-			return field.getValue().toString();
+			Object value = field.getValue();
+			return value != null ? value.toString() : "";
 
 		} else {
 
@@ -701,7 +722,7 @@ public class Indicator extends Base {
 				public void valueChange(ValueChangeEvent event) {
 					try {
 						double value = Double.parseDouble(tf.getValue());
-						indicator.modifyValueWithComment(main, base, value, new AbstractCommentCallback() {
+						indicator.updateWithComment(main, base, value, main.getUIState().forecastMeters, new AbstractCommentCallback() {
 							
 							public void canceled() {
 								tf.setValue(formatted);
@@ -843,7 +864,7 @@ public class Indicator extends Base {
 
 					@Override
 					public void click(com.vaadin.event.MouseEvents.ClickEvent event) {
-						Utils.openWiki(main, desc.indicator);
+						Wiki.openWiki(main, desc.indicator);
 					}
 
 				});
@@ -920,7 +941,7 @@ public class Indicator extends Base {
 		if(values == null && value != Double.NaN) {
 			Datatype datatype = Datatype.find(database, NumberDatatype.ID);
 			values = new TimeSeries(datatype);
-			values.addValue(BigDecimal.valueOf(value), null, null, null);
+			values.addValue(BigDecimal.valueOf(value), BigDecimal.valueOf(value), null, null, null);
 			value = Double.NaN;
 			result = true;
 		}
@@ -954,14 +975,14 @@ public class Indicator extends Base {
 		return result;
 	}
 	
-	public void modifyValueWithComment(final Main main, final Base base, final Object value, final CommentCallback callback) {
+	public void updateWithComment(final Main main, final Base base, final Object value, final boolean forecast, final CommentCallback callback) {
 		
-		Utils.commentDialog(main, "Päivitykseen littyvät lisätiedot", "Tallenna", "Ei lisätietoja", new CommentCallback() {
+		Dialogs.commentDialog(main, "Päivitykseen littyvät lisätiedot", "Tee muutokset", new CommentCallback() {
 			
 			@Override
 			public void runWithComment(String shortComment, String comment) {
 				
-				modifyValue(main, base, value, shortComment, comment);
+				update(main, base, value, forecast, shortComment, comment);
 				Updates.update(main, true);
 
 				if(callback != null)

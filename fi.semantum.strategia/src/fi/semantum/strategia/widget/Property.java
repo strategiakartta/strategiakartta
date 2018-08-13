@@ -41,13 +41,19 @@ public class Property extends Base {
 	public static final String TTL = "P‰ivitysvaatimus (p‰iv‰‰)";
 
 	public static final String OWN_GOAL_TYPE = "Own Goal Type";
+	@Deprecated
 	public static final String GOAL_TYPE = "Goal Type";
+	@Deprecated
 	public static final String FOCUS_TYPE = "Focus Type";
+	public static final String CHARACTER_DESCRIPTION = "Characteristic Description";
 	public static final String CHARACTER_COLOR = "Characteristic Color";
 	public static final String CHARACTER_TEXT_COLOR = "Characteristic Text Color";
+	public static final String GOAL_DESCRIPTION = "Goal Description";
+	public static final String LINK_WITH_PARENT = "Link With Parent";
+	public static final String LINK_GOALS_AND_SUBMAPS = "Link Goals And Submaps";
 
-	public static final String MANY_IMPLEMENTOR = "Many Implementor";
-	public static final String MANY_IMPLEMENTS = "Many Implements";
+//	public static final String MANY_IMPLEMENTOR = "Many Implementor";
+//	public static final String MANY_IMPLEMENTS = "Many Implements";
 
 	public static final String TYPE = "Tyyppi";
 
@@ -166,8 +172,11 @@ public class Property extends Base {
 		return set(main, main.getDatabase(), b, value);
 	}
 
-	public boolean set(Main main, Database db, Base b, String value) {
-
+	/*
+	 * TODO: Enumerated value can be uuid or it can be id
+	 */
+	public boolean set(Main main, Database database, Base b, String value) {
+		
 		Pair exist = null;
 		for(Pair p : b.properties) {
 			if(uuid.equals(p.first)) {
@@ -175,7 +184,10 @@ public class Property extends Base {
 			}
 		}
 
-		if(exist != null && exist.equals(value)) return false;
+		if(exist != null) {
+			if(exist.equals(value)) return false;
+			if(exist.second.equals(value)) return false;
+		}
 
 		if(main != null) {
 			if(!b.modified(main)) return false;
@@ -183,14 +195,29 @@ public class Property extends Base {
 
 		if(exist != null) b.properties.remove(exist);
 		if(objectType != null) {
-			for(Pair p : getObjectEnumeration(db)) {
-				if(p.second.equals(value)) {
+			for(Pair p : getObjectEnumeration(database)) {
+				if(p.first.equals(value)) {
+					// UUID
+					b.properties.add(Pair.make(uuid, p.first));
+					return true;
+				} else if(p.second.equals(value)) {
+					// id
 					b.properties.add(Pair.make(uuid, p.first));
 					return true;
 				}
 			}
 		} else {
 			b.properties.add(Pair.make(uuid, value));
+		}
+
+		if(AIKAVALI.equals(getId(database))) {
+			for(Base imp : Utils.getDirectImplementors(database, b, Property.AIKAVALI_KAIKKI)) {
+				set(main, database, imp, value);
+			}
+			Base copy = b.getPossibleCopy(database);
+			if(copy != null) {
+				set(main, database, copy, value);
+			}
 		}
 
 		return true;

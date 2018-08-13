@@ -21,10 +21,16 @@ public class Relation extends Base {
 	public static final String IMPLEMENTS = "Toteuttaa";
 	public static final String COPY = "Kopio";
 	public static final String MEASURES = "Mittaa";
+	public static final String RESPONSIBILITY_MODEL = "Vastuumalli";
+	public static final String RESPONSIBILITY_INSTANCE = "Vastuut";
+	
+	@Deprecated
 	public static final String ALLOWS_SUBMAP = "Sallittu alikartta";
 
 	public static final String RELATED_TO_TAG = "Liittyy aihetunnisteeseen";
 	public static final String MONITORS_TAG = "Monitoroi aihetunnistetta";
+
+	public static final String TAVOITE_SUBMAP = "Tavoitteen alikarttatyyppi";
 
 	public static Relation create(Database database, String name) {
 		Relation p = new Relation(name);
@@ -46,7 +52,7 @@ public class Relation extends Base {
 		for(Base b : database.objects.values()) {
 			if(b instanceof Relation) {
 				Relation p = (Relation)b;
-				if(name.equals(p.getText(database))) return p;
+				if(name.equals(p.text)) return p;
 			}
 		}
 		return null;
@@ -72,6 +78,12 @@ public class Relation extends Base {
 			}
 		}
 		return result;
+	}
+
+	public <T extends Base> T getPossibleRelationObject(Database database, Base b) {
+		Pair p = getPossibleRelation(b);
+		if(p == null) return null;
+		else return database.find(p.second);
 	}
 
 	public boolean hasRelations(Base b) {

@@ -93,6 +93,7 @@ public class BrowserNode implements Serializable {
 	public double charge;
 	public boolean emph;
 	public boolean fixed;
+	public boolean required = false;
 	public int nameSize;
 	public int descriptionSize;
 	public int w;

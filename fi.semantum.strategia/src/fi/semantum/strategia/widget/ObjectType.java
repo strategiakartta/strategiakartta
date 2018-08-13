@@ -40,15 +40,15 @@ public class ObjectType extends Base {
 	 */
 	
 	public static final String HALLINNONALA = "Hallinnonala";
-	public static final String VIRASTO = "Virasto";
+//	public static final String VIRASTO = "Virasto";
 	
-	public static final String TOIMIALA = "Toimiala";
+//	public static final String TOIMIALA = "Toimiala";
 	
-	public static final String LVM_OSASTO = "LVM:n osasto";
-	public static final String VIRASTO_OSASTO = "Viraston osasto";
+//	public static final String LVM_OSASTO = "LVM:n osasto";
+//	public static final String VIRASTO_OSASTO = "Viraston osasto";
 
-	public static final String KOKOAVA_YKSIKKO = "Vivin yksikkö";
-	public static final String TOTEUTTAVA_YKSIKKO = "Yksikkö";
+//	public static final String KOKOAVA_YKSIKKO = "Vivin yksikkö";
+//	public static final String TOTEUTTAVA_YKSIKKO = "Yksikkö";
 	
 	public static final String RYHMA = "Ryhmä";
 	
@@ -59,11 +59,11 @@ public class ObjectType extends Base {
 
 	public static final String STRATEGINEN_TAVOITE = "Strateginen tavoite";
 	public static final String PAINOPISTE = "Painopiste";
-	public static final String TULOSTAVOITE = "Tulostavoite";
-	public static final String HALLINNONALAN_PAINOPISTE = "Hallinnonalan painopiste";
-	public static final String TOIMENPIDE = "Toimenpide";
-	public static final String TOIMIALAN_TOIMENPIDE = "Toimialan toimenpide";
-	public static final String VASTUUHENKILO = "Vastuuhenkilö";
+//	public static final String TULOSTAVOITE = "Tulostavoite";
+//	public static final String HALLINNONALAN_PAINOPISTE = "Hallinnonalan painopiste";
+//	public static final String TOIMENPIDE = "Toimenpide";
+//	public static final String TOIMIALAN_TOIMENPIDE = "Toimialan toimenpide";
+//	public static final String VASTUUHENKILO = "Vastuuhenkilö";
 	
 	private static final long serialVersionUID = -1598499411379047877L;
 

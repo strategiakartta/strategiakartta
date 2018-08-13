@@ -12,8 +12,10 @@ package fi.semantum.strategia.widget;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -73,6 +75,27 @@ public class Tag extends Base {
 	@Override
 	public String getDescription(Database database) {
 		return getId(database) + " (Aihetunniste)";
+	}
+
+	public static Collection<String> extractTags(String text) {
+		
+		Set<String> result = new HashSet<String>();
+		
+		int pos = 0;
+		while(true) {
+			int start = text.indexOf('#', pos)+1;
+			if(start == 0) break;
+			pos = text.indexOf(' ', start+1);
+			if(pos == -1) {
+				result.add(text.substring(start));
+				break;
+			} else {
+				result.add(text.substring(start, pos));
+			}
+		}
+		
+		return result;
+		
 	}
 	
 	public static void updateRelatedTags(final Main main, boolean canWrite) {
@@ -158,7 +181,6 @@ public class Tag extends Base {
 	    				@Override
 	    				public void buttonClick(ClickEvent event) {
 	    					base.removeRelatedTags(database, tag);
-	    					base.removeMonitorTags(database, tag);
 							Utils.loseFocus(main.properties);
 							Updates.update(main, true);
 	    				}
@@ -240,8 +262,13 @@ public class Tag extends Base {
 
 		Set<Tag> monitoredTags = getMonitoredTags(database, base);
 		monitoredTags.removeAll(base.getRelatedTags(database));
+		Map<String,Base> implementors = new HashMap<String,Base>();
 		for(Base impl : Utils.getImplementationSet(database, base)) {
-			monitoredTags.removeAll(impl.getRelatedTags(database));
+			for(Tag i : impl.getRelatedTags(database)) {
+				if(monitoredTags.contains(i)) {
+					implementors.put(i.uuid, impl);
+				}
+			}
 		}
 		
 		if(!monitoredTags.isEmpty() || canWrite) {
@@ -287,30 +314,44 @@ public class Tag extends Base {
 	        	left.addComponent(tagButton);
 	        	left.setComponentAlignment(tagButton, Alignment.MIDDLE_RIGHT);
 
-	        	Button tagButton2 = new Button();
-	        	tagButton2.setCaption("Merkitse toteuttajaksi");
-	        	tagButton2.addStyleName("redButton");
-	        	tagButton2.addStyleName(ValoTheme.BUTTON_SMALL);
-	        	tagButton2.setWidth("200px");
-	        	if(canWrite) {
-	        		tagButton2.addClickListener(new ClickListener() {
+	        	Base implementor = implementors.get(tag.uuid);
+	        	if(implementor != null) {
+	        		
+	        		String desc = implementor.getId(database);
+	        		if(desc.isEmpty()) desc = implementor.getText(database);
+	        		
+	        		Label tagLabel = new Label("Toteutetaan ylemmällä tasolla: " + desc);
+		        	hl.addComponent(tagLabel);
+		        	hl.setComponentAlignment(tagLabel, Alignment.MIDDLE_LEFT);
 
-	        			private static final long serialVersionUID = -1769769368034323594L;
-
-	        			@Override
-	        			public void buttonClick(ClickEvent event) {
-	        				base.assertRelatedTags(database, tag);
-	        				Utils.loseFocus(main.properties);
-	        				Updates.update(main, true);
-	        			}
-
-	        		});
-	        		tagButton2.setEnabled(true);
 	        	} else {
-	        		tagButton2.setEnabled(false);
+	        	
+		        	Button tagButton2 = new Button();
+		        	tagButton2.setCaption("Merkitse toteuttajaksi");
+		        	tagButton2.addStyleName("redButton");
+		        	tagButton2.addStyleName(ValoTheme.BUTTON_SMALL);
+		        	tagButton2.setWidth("200px");
+		        	if(canWrite) {
+		        		tagButton2.addClickListener(new ClickListener() {
+	
+		        			private static final long serialVersionUID = -1769769368034323594L;
+	
+		        			@Override
+		        			public void buttonClick(ClickEvent event) {
+		        				base.assertRelatedTags(database, tag);
+		        				Utils.loseFocus(main.properties);
+		        				Updates.update(main, true);
+		        			}
+	
+		        		});
+		        		tagButton2.setEnabled(true);
+		        	} else {
+		        		tagButton2.setEnabled(false);
+		        	}
+		        	hl.addComponent(tagButton2);
+		        	hl.setComponentAlignment(tagButton2, Alignment.MIDDLE_LEFT);
+		        	
 	        	}
-	        	hl.addComponent(tagButton2);
-	        	hl.setComponentAlignment(tagButton2, Alignment.MIDDLE_LEFT);
 
 	        	right.addComponent(hl);
 	        	right.setComponentAlignment(hl, Alignment.MIDDLE_LEFT);
@@ -321,18 +362,23 @@ public class Tag extends Base {
 
 	}
 
-	public double getCoverage(Database database, Base owner) {
+	public double getCoverage(Main main, Base base) {
 		
-		if(owner.hasRelatedTag(database, this)) return 1.0;
+		Database database = main.getDatabase();
 		
-		Collection<Base> imp = Utils.getDirectImplementors(database, owner);
+		if(base.hasRelatedTag(database, this)) { 
+			return 1.0;
+		}
+		
+		Collection<Base> imp = Utils.getDirectImplementors(database, base, main.getUIState().time);
 		if(imp.isEmpty()) return 0.0;
 		
 		double result = 0.0;
 		double coeff = 1.0 / imp.size();
 		for(Base b : imp) {
-			result += coeff*getCoverage(database, b);
+			result += coeff*getCoverage(main, b);
 		}
+		
 		return result;
 		
 	}

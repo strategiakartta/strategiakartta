@@ -15,23 +15,18 @@ var a4ratio = 0.4;
 var mainMargin = a4ratio*37.0;
 var chartWidth = a4ratio*1920-2*mainMargin;
 var chartHeight = a4ratio*1500;
-var textPad = a4ratio*6;
+var textPad = 5;
 var boxPad = a4ratio*10;
-var visioX = a4ratio*300;
-var visioWidth = chartWidth - 2*visioX;
-var visioHeight = a4ratio*100;
-var tavoiteX = a4ratio*20 
+var visioX = 0.55*chartWidth;
+var visioWidth = 0.4*chartWidth;
+var visioHeight = a4ratio*100 + 25;
 var tavoiteSpacing = a4ratio*10;
-var tavoiteWidth = 0.5* (chartWidth - 2*tavoiteX - tavoiteSpacing);
 var painopisteMeterHeight = a4ratio*30;
 var painopisteTagHeight = a4ratio*20;
-var tavoiteMeterHeight = a4ratio*35;
+var tavoiteMeterHeight = a4ratio*25;
 var tavoiteTagHeight = a4ratio*25;
 var tavoiteHeight = a4ratio*265 + painopisteMeterHeight;
 var visioBaseY = a4ratio*70;
-var tavoiteBaseline = visioBaseY + visioHeight + a4ratio*30;
-var alikarttaBaseline = tavoiteBaseline + a4ratio*35;
-var painopisteWidth = (tavoiteWidth-(painopisteColumns+1)*boxPad)/painopisteColumns;
 var painopisteHeight = a4ratio*120 + painopisteMeterHeight;
 var painopisteY = tavoiteHeight - painopisteHeight - boxPad;
 var meterHeight = a4ratio*50;
@@ -54,16 +49,135 @@ function create(rootFn) {
 
 	var thisElement = rootFn.getElement();
 
+	var tooltipDIV = document.createElement("DIV");
+	
+	var state = rootFn.getState();
+	var strategiaKartta = state.model;
+
 	var root = d3.select(thisElement);
 	
 	var svg = root.append("svg")
 	.on("click", function(d) { 
 		rootFn.select(d3.event.pageX, d3.event.pageY); 
 	})
-	.attr("id", "map");
+	.attr("id", strategiaKartta.elementId);
 
+	document.body.appendChild(tooltipDIV);
+	tooltipDIV.classList.add("tooltip");
+	tooltipDIV.style.width = "600px";
+	//tooltipDIV.style.height = "200px";
+	tooltipDIV.style.position = "absolute";
+	tooltipDIV.style.borderRadius = "10px";
+	tooltipDIV.style.border = "1px solid black";
+	tooltipDIV.style.padding = "10px";
+	tooltipDIV.style.left = "100px";
+	tooltipDIV.style.top = "100px";
+	tooltipDIV.style.background = "#f1f1f1";
+	tooltipDIV.innerHTML = "";
+	
+	var notification;
+
+	function tryToGetInfo(e) {
+		
+		if(e == null) return null;
+
+		var classList = e.classList; 
+		if(classList.contains("header") || classList.contains("parent1") || (classList.contains("parent") && classList.contains("link"))) {
+			var base = "<h2>Karttojen otsikot</h2><p>Otsikkoalue näyttää sekä nykyisen kartan nimen että reitin jota pitkin karttaan on päästy ylemmän tason karttojen kautta.<p>Voit siirtyä ylemmän tason karttoihin klikkaamalla karttojen nimiä.<p>Voit muuttaa kartan otsikkoa klikkaamalla sitä mikäli olet syöttötilassa ja tunnuksellasi on muutosoikeus tähän karttaan.";
+			if(state.edit) {
+				if(state.logged) {
+					base += "<p><b>Olet syöttötilassa ja sinulla on kartan muutosoikeus. Voit muuttaa kartan otsikkoa klikkaamalla sitä.</b>";
+				} else {
+					base += "<p><b>Olet syöttötilassa, mutta tunnuksellasi ei ole tähän karttaan muutosoikeutta. Voit pyytää muutosoikeutta kartan ylläpitäjältä.</b>";
+				}
+			} else {
+				if(state.logged) {
+					base += "<p><b>Olet katselutilassa. Voit muuttaa kartan otsikkoa siirtymällä syöttötilaan yläpalkin toiminnolla ja tämän jälkeen klikkaamalla kartan otsikkoa.</b>";
+				} else {
+					base += "<p><b>Olet katselutilassa eikä tunnuksellasi ole kartan muutosoikeutta.</b>";
+				}
+			}
+			return base;
+		} else if(classList.contains("parent2")) {
+//			var base = "<h2>Strategiakartta</h2>";
+//			return base;
+			return null;
+		} else if(classList.contains("tavoite")) {
+//			var base = "<h2>Ulompi laatikko</h2>";
+//			return base;
+			return null;
+		} else if(classList.contains("meterElement")) {
+			var base = "<h2>Käyttäjän arvio</h2>";
+			var desc = e.dataset.meterDesc;
+			if(desc.length > 0) {
+				base += "<p><b> Selite: " + desc + ".</b>";
+		    }
+
+			base += "<p><b> Tämä arvio on kartan käyttäjän määrittelemä.</b>";
+
+			if(state.edit) {
+				if(state.logged) {
+					base += "<p><b>Olet syöttötilassa ja sinulla on kartan muutosoikeus. Voit muuttaa mittarin arvoa klikkaamalla sitä.</b>";
+				} else {
+					base += "<p><b>Olet syöttötilassa, mutta tunnuksellasi ei ole tähän karttaan muutosoikeutta. Voit pyytää muutosoikeutta kartan ylläpitäjältä.</b>";
+				}
+			} else {
+				if(state.logged) {
+					base += "<p><b>Olet katselutilassa. Voit muuttaa mittarin arvoa siirtymällä syöttötilaan yläpalkin toiminnolla ja tämän jälkeen klikkaamalla mittari-ikonia.</b>";
+				} else {
+					base += "<p><b>Olet katselutilassa eikä tunnuksellasi ole kartan muutosoikeutta.</b>";
+				}
+			}
+
+			return base;
+			
+		} else if(classList.contains("painopisteMeter")) {
+			var base = "<h2>Laskennallinen arvio</h2>";
+			var desc = e.dataset.meterDesc;
+			base += "<p><b> Alirakenteen arvioiden perusteella laskettu arvio.</b>";
+			if(desc.length > 0) {
+				base += "<p><b> Käyttäjän luonnehdinta: " + desc + "</b>";
+			}
+
+			if(e.dataset.link != "_") {
+				base += "<p><b>Voit siirtyä toteuttavaan alikarttaan klikkaamalla arviolaatikkoa.</b>";
+			}
+
+			return base;
+			
+		} else if(classList.contains("tavoiteMeter")) {
+			var base = "<h2>Laskennallinen arvio</h2>";
+			base += "<p><b> Sisempien laatikoiden perusteella laskettu arvio.</b>";
+			return base;
+		}
+		
+		if(e.parentNode == document) return null;
+		
+		return tryToGetInfo(e.parentNode);
+	    
+	}
+
+	document.addEventListener('mousemove', function (event) {
+
+		tooltipDIV.style.visibility = "hidden";
+		
+        clearTimeout(notification);
+        notification = setTimeout(function() { 
+    		if(event.target == undefined) return;
+    		console.log(event.target);
+    		var info = tryToGetInfo(event.target);
+    		if(info != null) {
+    			tooltipDIV.style.left = event.clientX + "px";
+    			tooltipDIV.style.top = event.clientY + "px";
+    			tooltipDIV.innerHTML = info;
+    			tooltipDIV.style.visibility = "visible";
+    		}
+        }, 1000);
+		
+	});
+	
 	var fillPattern = svg.append("defs").append("pattern")
-	.attr("id", "tavoitePattern")
+	.attr("id", "tavoitePattern_" + strategiaKartta.elementId)
 	.attr("patternUnits", "userSpaceOnUse")
 	.attr("width", a4ratio*50)
 	.attr("height", a4ratio*50)
@@ -89,47 +203,34 @@ function create(rootFn) {
 
 	var group = scaleGroup.append("g").classed("maingroup", true);
 
+	var parentsBaseGroup = scaleGroup.append("g").classed("parentsBase", true);
+	var parentsGroup = parentsBaseGroup.append("g").classed("parents", true);
+	
+	var tavoiteGroup = scaleGroup.append("g").classed("tavoitegroup", true);
+
 	var naviGroup = scaleGroup.append("g").classed("navigroup", true);
 
-	group.append('text').classed("header edit", true);
+	parentsBaseGroup.append('text').classed("header edit", true);
 
 	group.append('rect').classed("visio", true)
-	.attr("width", visioWidth)
-	.attr("height", visioHeight)
 	.attr("transform", "translate(" + visioX + "," + visioBaseY + ")")
 	.attr("rx", "2")
 	.attr("ry", "2");
 
-	group.append('rect').classed("goalLegend", true)
-	.attr("width", a4ratio*32)
-	.attr("height", a4ratio*32)
-	.attr("transform", "translate(" + (visioX+visioWidth+a4ratio*16) + "," + (visioBaseY+a4ratio*8) + ")")
+	group.append('rect').classed("mittariStatus", true)
+	.attr("width", "120")
+	.attr("height", "15")
 	.attr("rx", "2")
 	.attr("ry", "2");
 
-	group.append('text').classed("goalLegend", true)
-	.attr("transform", "translate(" + (visioX+visioWidth+a4ratio*55) + "," + (visioBaseY+a4ratio*28) + ")")
-	.style("font-size", "7px")
-	.text("Goal");
-
-	group.append('rect').classed("focusLegend", true)
-	.attr("width", a4ratio*32)
-	.attr("height", a4ratio*32)
-	.attr("transform", "translate(" + (visioX+visioWidth+a4ratio*16) + "," + (visioBaseY+a4ratio*48) + ")")
-	.attr("rx", "2")
-	.attr("ry", "2");
-
-	group.append('text').classed("focusLegend", true)
-	.attr("transform", "translate(" + (visioX+visioWidth+a4ratio*55) + "," + (visioBaseY+a4ratio*68) + ")")
-	.style("font-size", "7px")
-	.text("Focus");
+	group.append('text').classed("mittariStatus", true);
 
 	group.append('text').classed("visio edit", true)
 	.attr("transform", "translate(" + (visioX + 0.5*visioWidth) + "," + (visioBaseY+a4ratio*40) + ")");
 
 	naviGroup.append("text").classed("alas", true)
 	.attr("y", "20")
-	.text("Aliorganisaation strategiamääritykset:");
+	.text("Alatason kartat:");
 
 }
 
@@ -154,9 +255,23 @@ function shadeColor(color, percent) {
     return "#"+RR+GG+BB;
 }
 
+// This is a tight height of the text area
+function textHeight(linecount, fontsize) {
+  if(linecount == 1) {
+	  // a dy=0.2em is added for oneliners in wrapFocus
+	  return 1.4*fontsize;
+  } else {
+	  return fontsize + (linecount-1)*1.1*fontsize;
+  }
+}
+
 function refresh(rootFn) {
 
 	var thisElement = rootFn.getElement();
+	thisElement.style.width = "100%";
+	thisElement.style.height = "100%";
+	thisElement.style.overflowY = "auto";
+	
 	var state = rootFn.getState();
 	var strategiaKartta = state.model;
 	var root = d3.select(thisElement).datum(strategiaKartta);
@@ -169,46 +284,51 @@ function refresh(rootFn) {
 	var svg = root.select("svg");
 	
 	svg.attr("width", chartWidth*ratio);
+	svg.attr("height", "100%");
 
 	var scaleGroup = root.select("g.scalegroup")
 	.attr("transform", function(d) { return "scale(" + ratio + ")"; });
 
 	var mainGroup = root.select("g.maingroup");
+	var tavoiteGroup = root.select("g.tavoitegroup");
+	var parentsGroup = root.select("g.parents");
 
-	mainGroup.select("text.uusiTavoite")
-	.attr("visibility", function(d) { return state.logged ? "visible" : "hidden"; });
+	var parents = parentsGroup.selectAll("g.parent")
+	.data(function(d) { 
+		return d.path; 
+		});
 	
-	mainGroup.select("text.header")
-	.attr("transform", function(d) { return "translate(" + 0.5*chartWidth + "," + (a4ratio*45) + ")"; });
-
-	mainGroup.select("text.header")
-	.on("click", function(d) { 
-		if(state.logged) {
-			d3.event.stopPropagation();
-			rootFn.editHeader();
-		}
-	})
-	.style("cursor", function(d) { return state.logged ? "text" : "default"; })
-	.on("mouseover", function(d,i) { if(state.logged && !d.copy) d3.select(this).attr("fill", "#808080"); })
-	.on("mouseout", function(d,i) { d3.select(this).attr("fill", "#000000"); })
-	.attr("fill", "#000000")
-	.text(function(d) { return d.text.length > 0 ? d.text : "<ei nimeä>"; });
+	creates = parents.enter().append("g").classed("parent", true);
+	
+	creates.append("rect").classed("parent1", true);
+	creates.append("rect").classed("parent2", true);
+	creates.append("text").classed("parent link", true);
+	
+	parents.exit().remove();
+	
+	svg.select("rect.visio")
+	.attr("width", strategiaKartta.showVision ? visioWidth : "0")
+	.attr("height", strategiaKartta.showVision ? (visioHeight-25) : "0");
+	
+	mainGroup.select("text.uusiTavoite")
+	.attr("visibility", function(d) { return ((state.logged && state.edit) && state.edit) ? "visible" : "hidden"; });
 	
 	mainGroup.select("text.visio.edit")
 	.text(function(d) { return d.visio.length > 0 ? d.visio : "<ei visiota>"; })
-	.style("cursor", function(d) { return state.logged ? "text" : "default"; })
+	.attr("visibility", strategiaKartta.showVision ? "visible" : "hidden")
+	.style("cursor", function(d) { return ((state.logged && state.edit) && state.edit) ? "text" : "default"; })
 	.on("click", function(d) { 
-		if(state.logged)  {
+		if((state.logged && state.edit))  {
 			d3.event.stopPropagation();
 			rootFn.editVisio();
 		}
 	})
-	.on("mouseover", function(d,i) { if(state.logged && !d.copy) d3.select(this).style("fill", "#808080"); })
+	.on("mouseover", function(d,i) { if((state.logged && state.edit) && !d.copy) d3.select(this).style("fill", "#808080"); })
 	.on("mouseout", function(d,i) { d3.select(this).style("fill", "#fff"); })
 	.attr("fill", "#000000")
 	.call(wrapVisio, visioWidth-2*textPad);
 
-	mainGroup.select("text.goalLegend")
+/*	mainGroup.select("text.goalLegend")
 	.text(function(d) { return strategiaKartta.tavoiteDescription; });
 
 	mainGroup.select("rect.goalLegend")
@@ -218,10 +338,16 @@ function refresh(rootFn) {
 	.text(function(d) { return strategiaKartta.painopisteDescription; });
 
 	mainGroup.select("rect.focusLegend")
-	.style("fill", function(d) { return strategiaKartta.painopisteColor; });
-	
-	tavoitteet(rootFn, mainGroup, strategiaKartta);
+	.style("fill", function(d) { return strategiaKartta.painopisteColor; });*/
 
+	overlayCount = strategiaKartta.path.length;
+	overlayMargin = 4;
+	tavoiteX = a4ratio*20; 
+	tavoiteWidth = 0.5 * (chartWidth -2*overlayCount*overlayMargin - 2*tavoiteX - tavoiteSpacing);
+	painopisteWidth = (tavoiteWidth-(painopisteColumns+1)*boxPad)/painopisteColumns;
+
+	tavoitteet(rootFn, tavoiteGroup, strategiaKartta);
+	
 	// layout after text wrapping
 	var pps = thisElement.querySelectorAll('g.painopiste');
 	for (var i=0;i<pps.length;i++) {
@@ -230,6 +356,7 @@ function refresh(rootFn) {
 		
 		var ppRect = pp.childNodes[0];
 		var content = pp.childNodes[3];
+		var id = content.childNodes[0];
 		var text = content.childNodes[1];
 
 		content.setAttribute('transform', 'translate(0,0)');
@@ -240,21 +367,29 @@ function refresh(rootFn) {
 		var tagHeight = ((tags.length > 0) ? (painopisteTagHeight+boxPad) : 0.0);
 		var meterHeight = ((meters.length > 0) ? (painopisteMeterHeight+boxPad) : 0.0);
 
-		var lines = parseInt(text.getAttribute('lineCount'),10);
-		var contentHeight = (20 + lines  * 9.0);
+		var lines1 = parseInt(id.getAttribute('lineCount'),10);
+		var lines2 = parseInt(text.getAttribute('lineCount'),10);
+
+		var idAreaHeight = textHeight(lines1, 6.0);
+		// 0.5 em offset on both sides of id element + baseline
+		var textOffset = 1.0*6.0 + 1.0*9.0;
+		
+		text.setAttribute("transform", "translate(" + (0.5*painopisteWidth) + ", " + (textOffset+idAreaHeight) + ")");
+		
+		var contentHeight = (1.0*6.0 + 0.5*9.0 + idAreaHeight + textHeight(lines2, 9.0));
 		
 		var currentY = 0;
 		var currentX = boxPad;
 		for (var j=0;j<tags.length;j++) {
 			
 			var g = tags[j];
-			var fillRect = g.childNodes[0];
-			var rect = g.childNodes[1];
-			var text = g.childNodes[2];
+			//var fillRect = g.childNodes[0];
+			var rect = g.childNodes[0];
+			var text = g.childNodes[1];
 			var wordLength = text.getComputedTextLength();
 			
 			rect.setAttribute('width', '' + (wordLength+4));
-			fillRect.setAttribute('width', '' + g.__data__.fillRatio*(wordLength+4));
+			//fillRect.setAttribute('width', '' + g.__data__.fillRatio*(wordLength+4));
 
 			var newX = currentX + wordLength + 4 + boxPad;
 			
@@ -300,6 +435,7 @@ function refresh(rootFn) {
 		var pxHeight = contentHeight + meterHeight + tagHeight;
 		
 		ppRect.setAttribute('height', pxHeight);
+		ppRect.setAttribute('width', painopisteWidth);
 
 		var tagsG = pp.querySelectorAll('g.painopisteTags');
 		tagsG[0].setAttribute('transform', 'translate(0, ' + (pxHeight-meterHeight-tagHeight) + ')');
@@ -319,7 +455,7 @@ function refresh(rootFn) {
 		var meters = t.querySelectorAll('g.tavoiteMeter');
 		
 		var tagHeight = ((tags.length > 0) ? (tavoiteTagHeight+boxPad) : 0.0);
-		var meterHeight = ((meters.length > 0) ? (tavoiteMeterHeight+boxPad) : 0.0);
+		var meterHeight = 0.0;//((meters.length > 0) ? (tavoiteMeterHeight+boxPad) : 0.0);
 
 		var lines = parseInt(text.getAttribute('lineCount'),10);
 		var contentHeight = (25 + lines  * 11.0);
@@ -329,12 +465,12 @@ function refresh(rootFn) {
 		for (var j=0;j<tags.length;j++) {
 			
 			var g = tags[j];
-			var fillRect = g.childNodes[0];
-			var rect = g.childNodes[1];
-			var text = g.childNodes[2];
+			//var fillRect = g.childNodes[0];
+			var rect = g.childNodes[0];
+			var text = g.childNodes[1];
 			var wordLength = text.getComputedTextLength();
 			
-			fillRect.setAttribute('width', '' + g.__data__.fillRatio*(wordLength+4));
+			//fillRect.setAttribute('width', '' + g.__data__.fillRatio*(wordLength+4));
 			rect.setAttribute('width', '' + (wordLength+4));
 			
 			var newX = currentX + wordLength + 4 + boxPad;
@@ -375,7 +511,6 @@ function refresh(rootFn) {
 			currentX = newX;
 
 		}
-
 		
 		var ps = t.querySelectorAll('g.painopiste');
 		var currentY = contentHeight + tagHeight;
@@ -397,14 +532,17 @@ function refresh(rootFn) {
 		var trect = t.childNodes[0];
 		var h = currentY+rowHeight+boxPad;
 		trect.setAttribute('height', h);
+		trect.setAttribute('width', tavoiteWidth);
 		
 		var meterG = t.querySelectorAll('g.tavoiteMeters');
-		meterG[0].setAttribute('transform', 'translate(0, ' + (h-meterHeight) + ')');
+		meterG[0].setAttribute('transform', 'translate(0,' + boxPad + ')');
 		
 	}
 
-	var maxY = 0;
-	var currentY = tavoiteBaseline;
+	var targetElement;
+	
+	var maxY = 0;//tavoiteBaseline;
+	var currentY = 0;//tavoiteBaseline + overlayCount*overlayMargin;
 	var rowHeight = 0.0;
 	var rowStart = 0;
 	for (var i=0;i<ts.length;i++) {
@@ -413,6 +551,12 @@ function refresh(rootFn) {
 		var rect = g.childNodes[0];
 		
 		if(g.__data__.startNewRow) {
+			
+			for( var j=rowStart;j<i;j++) {
+				var gg = ts[j];
+				gg.childNodes[0].setAttribute('height', rowHeight);
+			}
+			
 			currentY += rowHeight + boxPad;
 			rowHeight = 0.0;
 			rowStart = i;
@@ -425,51 +569,186 @@ function refresh(rootFn) {
 		var yOffset = g.__data__.yOffset;
 		rowHeight += yOffset;
 
-		g.setAttribute('transform', 'translate(' + (tavoiteX+xOffset+(tavoiteWidth+tavoiteSpacing)*(i-rowStart)) + ',' + (currentY+yOffset) + ')');
+		g.setAttribute('transform', 'translate(' + (overlayCount*overlayMargin + tavoiteX+xOffset+(tavoiteWidth+tavoiteSpacing)*(i-rowStart)) + ',' + (currentY+yOffset) + ')');
+		
+		if(strategiaKartta.scrollFocus == i) {
+			targetElement = rect;
+		}
 		
 		if((currentY+yOffset+height) > maxY) maxY = (currentY+yOffset+height); 
 		
 	}
+	
+	var tavoiteAreaHeight = maxY+boxPad;
+	
+	parentsGroup.selectAll("text.parent")
+	.data(function(d) { 
+		return d.path; 
+		})
+	.on("click", function(d,i) { 
+		d3.event.stopPropagation();
+		rootFn.navigate(d.uuid); 
+	})
+	.on("mouseover", function(d,i) { if(state.logged) d3.select(this).style("fill", "#808080"); })
+	.on("mouseout", function(d,i) { d3.select(this).style("fill", d.textColor); })
+	.style("cursor", function(d) { return "pointer"; })
+    .style("fill", function(d,i) { return d.textColor; })
+    .style("visibility", function(d,i) { 
+    	return "visible"; 
+    	})
+    .style("font-size", function(d,i) { 
+    	return "10px"; 
+    	})
+	.attr("transform", function(d,i) { return "translate(" + (tavoiteX+overlayMargin*(i+1)) + ",11)"; })
+	.text(function(d,i) { return d.text; })
+	.call(wrapLineN, 0.5*chartWidth - 2*overlayMargin*strategiaKartta.path.length);
+	
+	parentsGroup.selectAll("rect.parent1")
+	.data(function(d) { 
+		return d.path; 
+		})
+	.style("stroke-width", 0)
+	.attr("rx", "2")
+	.attr("ry", "2")
+	.attr("width", function(d,i) { return 0.5*chartWidth - 2*overlayMargin*i; })
+	.attr("x", function(d,i) { return tavoiteX+overlayMargin*i; })
+	.style("fill", function(d,i) { return d.backgroundColor; });
+	
+	parentsGroup.selectAll("rect.parent2")
+	.data(function(d) { 
+		return d.path; 
+		})
+	.style("stroke-width", 0)
+	.attr("rx", "2")
+	.attr("ry", "2")
+	.attr("width", function(d,i) { return chartWidth-2*overlayMargin*i - 2*boxPad; })
+	.attr("height", function(d,i) {  return tavoiteAreaHeight+2*overlayMargin*(strategiaKartta.path.length-i-1); })
+	.attr("x", function(d,i) { return tavoiteX+overlayMargin*i; })
+	.style("fill", function(d,i) { return d.backgroundColor; });
+	
+	scaleGroup.select("text.header")
+	.on("click", function(d) { 
+		if((state.logged && state.edit)) {
+			d3.event.stopPropagation();
+			rootFn.editHeader();
+		}
+	})
+	.style("cursor", function(d) { return (state.logged && state.edit) ? "text" : "default"; })
+	.on("mouseover", function(d,i) { if((state.logged && state.edit) && !d.copy) d3.select(this).attr("fill", "#808080"); })
+	.on("mouseout", function(d,i) { d3.select(this).attr("fill", "#000000"); })
+	.attr("fill", "#000000")
+	.text(function(d) { 
+		return d.text.length > 0 ? d.text : "<ei nimeä>"; 
+	})
+	.call(wrapLineN, 0.5*chartWidth - 2*overlayMargin*strategiaKartta.path.length);
+	
+	var parentGs = thisElement.querySelectorAll('g.parent');
+	var parentGOffset = 0;
+	
+	for (var i=0;i<parentGs.length;i++) {
+		
+		var g = parentGs[i];
+		
+		var rect1 = g.childNodes[0];
+		var rect2 = g.childNodes[1];
+		var text = g.childNodes[2];
+		var bBox = text.getBBox();
 
+		if(i == parentGs.length - 1) {
+			
+			text.style.fontSize = '14px';
+			text.style.visibility = 'hidden';
+
+			var header = scaleGroup.select("text.header")
+			.attr("transform", function(d) { return "translate(" + (5+tavoiteX + overlayMargin*strategiaKartta.path.length) + "," + (15 + parentGOffset) + ")"; });
+			bBox = header[0][0].getBBox();
+			
+	    }
+		
+		//g.setAttribute('transform', 'translate(0,' + parentGOffset + ')');
+		
+		rect1.setAttribute('y', parentGOffset);
+		text.setAttribute('y', parentGOffset);
+
+		parentGOffset += overlayMargin + bBox.height;
+		
+	}
+	
+	for (var i=0;i<parentGs.length;i++) {
+		
+		var g = parentGs[i];
+		
+		var rect1 = g.childNodes[0];
+		var rect2 = g.childNodes[1];
+
+		var y = parentGOffset - overlayMargin*(parentGs.length-i-1);
+		
+		rect2.setAttribute('y', y);
+		
+		var rect1Y = rect1.getAttribute('y');
+		rect1.setAttribute('height', (3+y-rect1Y));
+		
+	}
+
+	
+	var parentHeight = parentGOffset;
+	var parentBaseline = 10;
+	
+	if(strategiaKartta.showVision) {
+		var visioBaseline = visioBaseY+visioHeight+boxPad+overlayMargin*strategiaKartta.path.length;
+		if(parentBaseline+parentHeight < visioBaseline)
+			parentBaseline = visioBaseline-parentHeight;
+	}
+	
+	var naviBaseline = parentBaseline + parentHeight + tavoiteAreaHeight + overlayMargin*(strategiaKartta.path.length-1);
+	
 	var naviGroup = root.select("g.navigroup")
-	.attr("transform", function(d) { return "translate(0," + (currentY+rowHeight) + ")"; });
+	.attr("transform", function(d) { return "translate(0," + naviBaseline + ")"; });
 
 	naviGroup.select("text.alas")
-	.attr("transform", function(d) { return "translate(" + 0.5*chartWidth + ",0)"; });
-
+	.attr("transform", function(d) { return "translate(" + 0.5*chartWidth + ",0)"; })
+	.attr("visibility", function(d) { return (strategiaKartta.alikartat.length > 0) ? "visible" : "hidden"; });
+	
 	naviGroup.select("text.uusiAliorganisaatio")
-	.attr("visibility", function(d) { return state.logged ? "visible" : "hidden"; })
+	.attr("visibility", function(d) { return (state.logged && state.edit) ? "visible" : "hidden"; })
 	.attr("transform", function(d) { return "translate(" + (a4ratio*25) + ",0)"; });
 
 	var naviHeight = navigointiLinkit(rootFn, naviGroup, strategiaKartta);
-	
-	var parents = mainGroup.selectAll("text.parents")
-	.data(function(d) { 
-		return d.parents; 
-		});
-	
-	creates = parents.enter().append("text").classed("parents link", true)
-	.attr("transform", "translate(20,42)");
-	
-	parents.on("click", function(d,i) { 
-		d3.event.stopPropagation();
-		rootFn.navigate(d.uuid); 
-	});
-	parents.text(function(d,i) { return strategiaKartta.showNavigation ? "Ylös: " + d.text : ""; });
 
-	parents.exit().remove();
-	
+	var parentsBaseGroupElement = thisElement.querySelectorAll('g.parentsBase')[0]; 
+	parentsBaseGroupElement.setAttribute('transform', 'translate(0,' + parentBaseline + ')');
+	var tavoiteGroupElement = thisElement.querySelectorAll('g.tavoitegroup')[0]; 
+	tavoiteGroupElement.setAttribute('transform', 'translate(0,' + (parentBaseline+parentHeight) + ')');
+
+	svg.select("rect.mittariStatus")
+	.attr("visibility", function(d) { return strategiaKartta.meterStatus != "" ? "visible": "hidden"; })
+	.attr("transform", "translate(" + (visioX + visioWidth - 120) + "," + (parentBaseline+parentHeight-overlayMargin*(strategiaKartta.path.length-1) - 20) + ")");
+
+	svg.select("text.mittariStatus")
+	.text(function(d) { 
+		return strategiaKartta.meterStatus; })
+	.attr("visibility", function(d) { return strategiaKartta.meterStatus != "" ? "visible": "hidden"; })
+	.attr("transform", "translate(" + (visioX + visioWidth - 60.0) + "," + (parentBaseline+parentHeight-overlayMargin*(strategiaKartta.path.length-1) - 9) + ")");
+
 	if(strategiaKartta.showNavigation) {
-		svg.attr("height", (maxY+naviHeight)*ratio);
+		svg.attr("height", (naviBaseline + naviHeight)*ratio);
 	} else {
-		svg.attr("height", maxY*ratio);
+		svg.attr("height", naviBaseline*ratio);
 	}
+
+	//if(typeof(targetElement) != 'undefined') {
+	//	var targetRect = targetElement.getBoundingClientRect();
+	//	var mapElement = document.getElementById('mapContainer1');
+	//	mapElement.scrollTop = targetRect.top;
+	//	//window.scrollTo(0, 273);
+	//}
 	
 }
 
 function tavoitteet(rootFn, svgs, map) {
 
 	var state = rootFn.getState();
+	var strategiaKartta = state.model;
 
 	var tavoitteet = svgs.selectAll("g.tavoite")
 	.data(function(d) { return d.tavoitteet; });
@@ -480,7 +759,7 @@ function tavoitteet(rootFn, svgs, map) {
 	.attr("width", "" + tavoiteWidth+"px")
 	.attr("rx", "2")
 	.attr("ry", "2")
-	.style("cursor", function(d) { return "pointer"; })
+	//.style("cursor", function(d) { return "pointer"; })
 	.on("click", function(d,i) { 
 		d3.event.stopPropagation();
 		rootFn.navi(d3.event.pageX, d3.event.pageY, d.realIndex); 
@@ -491,16 +770,18 @@ function tavoitteet(rootFn, svgs, map) {
 
 	creates.append("text").classed("tavoite textElement", true)
 	.attr("transform", "translate(" + (0.5*tavoiteWidth) + ", " + (a4ratio*60) + ")");
-	
+
+	creates.append("text").classed("tavoite drillElement", true);
+
 	creates.append("g").classed("tavoiteMeters", true);
-	creates.append("g").classed("tavoiteTags", true);
+	//creates.append("g").classed("tavoiteTags", true);
 
 	svgs.selectAll("text.tavoite.idElement")
 	.data(function(d) { return d.tavoitteet; })
-	.style("cursor", function(d) { return (state.logged && !d.copy) ? "text" : "default"; })
+	.style("cursor", function(d) { return ((state.logged && state.edit) && !d.copy) ? "text" : "default"; })
 	.style("fill", function(d) { return map.tavoiteTextColor; })
-	.on("click", function(d,i) { 
-		if(state.logged && !d.copy) {
+	.on("click", function(d,i) {
+		if((state.logged && state.edit) && !d.copy) {
 			d3.event.stopPropagation();
 			rootFn.editTavoite(d.realIndex); 
 		}
@@ -510,27 +791,49 @@ function tavoitteet(rootFn, svgs, map) {
 
 	svgs.selectAll("text.tavoite.textElement")
 	.data(function(d) { return d.tavoitteet; })
-	.style("cursor", function(d) { return (state.logged && !d.copy) ? "text" : "default"; })
+	.style("cursor", function(d) { return ((state.logged && state.edit) && !d.copy) ? "text" : "default"; })
 	.text(function(d) { return d.text.length > 0 ? d.text : "<ei nimeä>"; })
 	.style("fill", function(d) { return map.tavoiteTextColor; })
 	.on("click", function(d,i) { 
-		if(state.logged && !d.copy) { 
+		if((state.logged && state.edit) && !d.copy) { 
 			d3.event.stopPropagation();
 			rootFn.editTavoite(d.realIndex); 
 		}
 	})
-	.on("mouseover", function(d,i) { if(state.logged && !d.copy) d3.select(this).style("fill", "#808080"); })
+	.on("mouseover", function(d,i) { if((state.logged && state.edit) && !d.copy) d3.select(this).style("fill", "#808080"); })
 	.on("mouseout", function(d,i) { d3.select(this).style("fill", map.tavoiteTextColor); })
 	.call(wrapFocus, tavoiteWidth-2*textPad);
 
+	svgs.selectAll("text.tavoite.drillElement")
+	.data(function(d) { return d.tavoitteet; })
+	.attr("transform", "translate(" + (tavoiteWidth-20) + ", " + (a4ratio*36) + ")")
+	.style("cursor", "pointer")
+	.style("fill", function(d) { return map.tavoiteTextColor; })
+	.style("font-family", "FontAwesome" )
+	.style("font-size", "16px" )
+	.attr("visibility", function(d) { return d.drill ? "visible" : "hidden"; })
+	.on("mouseover", function(d,i) { d3.select(this).style("fill", "#808080"); })
+	.on("mouseout", function(d,i) { d3.select(this).style("fill", map.tavoiteTextColor); })
+	.on("click", function(d,i) {
+		d3.event.stopPropagation();
+		rootFn.drill(d.realIndex); 
+	})
+    .text(function(d) { return "\uf090";});
+
+	
 	svgs.selectAll("rect.tavoite")
 	.data(function(d) { return d.tavoitteet; })
-	.style("fill", function(d) { return d.stripes ? "url(#tavoitePattern)" : d.color; });
+	.style("fill", function(d) { return d.stripes ? "url(#tavoitePattern_" + strategiaKartta.elementId + ")" : d.color; })
+	.on("mouseover", function(d,i) { 
+		if(state.logged)
+			d3.select(this).style("stroke-width", 0.8); 
+		})
+	.on("mouseout", function(d,i) { d3.select(this).style("stroke-width", 0); });
 
 	tavoitteet.exit().remove();
 
 	// Tavoitteiden aihetunnisteet
-	{
+	/*{
 
 		var tagG = svgs.selectAll("g.tavoiteTags")
 		.data(function(d) { 
@@ -547,19 +850,22 @@ function tavoitteet(rootFn, svgs, map) {
 		creates.append("rect").classed("tavoiteTag", true)
 		.data(function(d) { return d.tags; })
 		.attr("height", "" + (tavoiteTagHeight))
-		.style("cursor", "pointer")
-		.style("stroke-width", "0")
+		.attr("rx", "" + a4ratio*2)
+		//.style("cursor", "pointer")
+		.style("stroke-width", 0)
 		.style("fill", function(d) { return d.color;});
+		*/
 
-		creates.append("rect").classed("tavoiteTag", true)
+/*		creates.append("rect").classed("tavoiteTag", true)
 		.data(function(d) { return d.tags; })
 		.attr("rx", "" + a4ratio*2)
 		.attr("height", "" + tavoiteTagHeight)
 		.style("cursor", "pointer")
 		.style("stroke-width", "1")
 		.style("stroke", function(d) { return d.color;})
-		.style("fill", "none");
+		.style("fill", "none");*/
 
+	/*
 		creates.append("text").classed("tavoiteTag", true)
 		.data(function(d) { return d.tags; })
 		.attr("x", "2")
@@ -568,7 +874,15 @@ function tavoitteet(rootFn, svgs, map) {
 		
 		tavoiteTags.exit().remove();
 		
-	}
+		tagG.selectAll("rect.tavoiteTag")
+		.data(function(d,i) { return d.tags; })
+		.style("fill", function(d) { return d.color;});
+		
+		tagG.selectAll("text.tavoiteTag")
+		.data(function(d) { return d.tags; })
+		.text(function(d) { return d.text; });
+		
+	}*/
 	
 	// Tavoitteiden mittarit
 	{
@@ -590,21 +904,20 @@ function tavoitteet(rootFn, svgs, map) {
 		.attr("rx", "1")
 		.on("click", function(d,i) { 
 			d3.event.stopPropagation();
-			rootFn.selectMeter(d.tavoite, d.painopiste, d.realIndex); 
+			rootFn.selectMeter(d.tavoite, d.painopiste, d.realIndex, d.link); 
 		})
 		.style("stroke", "#111")
-		.style("stroke-width", "0")
+		.style("stroke-width", 0)
 		.style("fill", function(d) { return d.color;})
 		.call(wrapFocus, painopisteWidth-2*textPad);
 
 		creates.append("text").classed("tavoiteMeter", true)
 		.attr("x", "2")
-		.attr("y", "11")
+		.attr("y", "8")
 		.on("click", function(d,i) { 
 			d3.event.stopPropagation();
-			rootFn.selectMeter(d.tavoite, d.painopiste, d.realIndex); 
-		})
-		.text(function(d,i) { return d.text; });
+			rootFn.selectMeter(d.tavoite, d.painopiste, d.realIndex, d.link); 
+		});
 
 		tavoiteMeters.exit().remove();
 
@@ -612,13 +925,17 @@ function tavoitteet(rootFn, svgs, map) {
 		.data(function(d,i) { return d.meters; })
 		.style("fill", function(d) { return d.color;});
 		
+		meterG.selectAll("text.tavoiteMeter")
+		.data(function(d) { return d.meters; })
+		.text(function(d) { return d.text; });
+		
 	}
 	
 	{
 
 		// Painopisteet
 		var painopisteet = tavoitteet.selectAll("g.painopiste")
-		.data(function(d,i) {
+		.data(function(d) {
 			return d.painopisteet;
 		});
 
@@ -629,7 +946,7 @@ function tavoitteet(rootFn, svgs, map) {
 		.attr("height", painopisteHeight)
 		.attr("rx", "2")
 		.attr("ry", "2")
-		.style("cursor", function(d) { return "pointer"; })
+		//.style("cursor", function(d) { return "pointer"; })
 		.on("click", function(d,i) { 
 			d3.event.stopPropagation();
 			rootFn.navi2(d3.event.pageX, d3.event.pageY, d.tavoite, d.realIndex);
@@ -640,34 +957,101 @@ function tavoitteet(rootFn, svgs, map) {
 
 		creates = creates.append("g").classed("painopisteContent", true);
 
+		// Vertical alignment for text is baseline - start text from 0.5em
 		creates.append("text").classed("painopiste idElement", true)
-		.attr("transform", "translate(" + (0.5*painopisteWidth) + ", " + (a4ratio*21) + ")");
+		//.attr("transform", "translate(" + (0.5*painopisteWidth) + ", " + (textPad + 3.0) + ")");
+		.attr("transform", "translate(" + (0.5*painopisteWidth) + ", " + (1.5*6.0) + ")");
 
-		creates.append("text").classed("painopiste textElement", true)
-		.attr("transform", "translate(" + (0.5*painopisteWidth) + ", " + (textPad+a4ratio*45) + ")");
+		creates.append("text").classed("painopiste textElement", true);
+		
+		creates.append("text").classed("painopiste infoElement", true);
+		creates.append("text").classed("painopiste meterElement", true);
+
+		tavoitteet.selectAll("text.painopiste.infoElement")
+		.data(function(d,i) {
+			return d.painopisteet;
+		})
+		.attr("transform", "translate(" + (painopisteWidth-15) + ", 9)");
+		tavoitteet.selectAll("text.painopiste.meterElement")
+		.data(function(d,i) {
+			return d.painopisteet;
+		})
+		.attr("transform", "translate(" + (5) + ", 11)");
 
 		tavoitteet.selectAll("text.painopiste.idElement")
 		.data(function(d,i) {
 			return d.painopisteet;
 		})
-		.text(function(d) { return d.id; });
+	    .style("fill", function(d) { return map.painopisteTextColor; })
+		.text(function(d) { return d.id; })
+		.call(wrapFocus, painopisteWidth-4*textPad);
 
 		tavoitteet.selectAll("text.painopiste.textElement")
 		.data(function(d,i) {
 			return d.painopisteet;
 		})
-		.style("cursor", function(d) { return (state.logged && !d.copy) ? "text" : "default"; })
+	    .style("fill", function(d) { return map.painopisteTextColor; })
+		.style("cursor", function(d) { return ((state.logged && state.edit)) ? "text" : "default"; })
 		.text(function(d) { return d.text.length > 0 ? d.text : "<ei tekstiä>";})
 		.on("click", function(d,i) { 
-			if(state.logged && !d.copy) {
+			if((state.logged && state.edit)) {
 				d3.event.stopPropagation();
 				rootFn.editPainopiste(d.tavoite, d.realIndex); 
 			}
 		})
-		.on("mouseover", function(d,i) { if(state.logged && !d.copy) d3.select(this).style("fill", "#808080"); })
-		.on("mouseout", function(d,i) { d3.select(this).style("fill", "#000000"); })
+		.on("mouseover", function(d,i) { if((state.logged && state.edit)) d3.select(this).style("fill", "#808080"); })
+		.on("mouseout", function(d,i) { d3.select(this).style("fill", map.painopisteTextColor); })
 		.call(wrapFocus, painopisteWidth-2*textPad);
 
+		tavoitteet.selectAll("text.painopiste.infoElement")
+		.data(function(d,i) {
+			return d.painopisteet;
+		})
+	    .style("fill", function(d) { return map.painopisteTextColor; })
+		.style("cursor", function(d) { return ((state.logged)) ? "pointer" : "default"; })
+		.text(function(d) { return "\uf003";})
+	    .attr("visibility", function(d) { 
+	    	return d.hasInfo ? "visible" : "hidden"; })
+		.on("click", function(d,i) { 
+			d3.event.stopPropagation();
+			rootFn.displayInfo(d.tavoite, d.realIndex); 
+		})
+		.on("mouseover", function(d,i) { d3.select(this).style("fill", "#808080"); })
+		.on("mouseout", function(d,i) { d3.select(this).style("fill", map.painopisteTextColor); })
+		.call(wrapFocus, painopisteWidth-2*textPad);
+		
+		tavoitteet.selectAll("text.painopiste.meterElement")
+		.data(function(d,i) {
+			return d.painopisteet;
+		})
+	    .style("fill", function(d) { return d.leafMeterColor; })
+	    .style("font-size", "10px" )
+	    .attr("data-meterDesc", function(d) { return d.leafMeterDesc; })
+	    .attr("visibility", function(d) { 
+	    	return d.leaf ? "visible" : "hidden"; })
+		.style("cursor", function(d) { return ((state.logged)) ? "pointer" : "default"; })
+		.text(function(d) { return "\uf201";})
+		.on("click", function(d,i) { 
+			d3.event.stopPropagation();
+			if(state.logged && state.edit) {
+				rootFn.displayMeter(d.tavoite, d.realIndex);
+			}
+		})
+
+		.on("mouseover", function(d,i) { if(state.logged && state.edit) d3.select(this).style("fill", "#808080"); })
+		.on("mouseout", function(d,i) { d3.select(this).style("fill", d.leafMeterColor); })
+		.call(wrapFocus, painopisteWidth-2*textPad);
+
+		tavoitteet.selectAll("rect.painopiste")
+		.data(function(d,i) {
+			return d.painopisteet;
+		})
+		.on("mouseover", function(d,i) { 
+			if(state.logged)
+				d3.select(this).style("stroke-width", 0.8); 
+			})
+		.on("mouseout", function(d,i) { d3.select(this).style("stroke-width", 0); });
+		
 		tavoitteet.selectAll("rect.painopiste")
 		.data(function(d,i) {
 			return d.painopisteet;
@@ -695,19 +1079,20 @@ function tavoitteet(rootFn, svgs, map) {
 
 		creates.append("rect").classed("painopisteTag", true)
 		.data(function(d) { return d.tags; })
+		.attr("rx", "" + a4ratio*2)
 		.attr("height", "" + (painopisteTagHeight))
 		.style("cursor", "pointer")
-		.style("stroke-width", "0")
+		.style("stroke-width", 0)
 		.style("fill", function(d) { return d.color;});
 
-		creates.append("rect").classed("painopisteTag", true)
+		/*creates.append("rect").classed("painopisteTag", true)
 		.data(function(d) { return d.tags; })
 		.attr("rx", "" + a4ratio*2)
 		.attr("height", "" + painopisteTagHeight)
 		.style("cursor", "pointer")
 		.style("stroke-width", "1")
 		.style("stroke", function(d) { return d.color;})
-		.style("fill", "none");
+		.style("fill", "none");*/
 
 		creates.append("text").classed("painopisteTag", true)
 		.data(function(d) { return d.tags; })
@@ -717,6 +1102,14 @@ function tavoitteet(rootFn, svgs, map) {
 
 		painopisteTags.exit().remove();
 		
+		tagG.selectAll("rect.painopisteTag")
+		.data(function(d,i) { return d.tags; })
+		.style("fill", function(d) { return d.color;});
+		
+		tagG.selectAll("text.painopisteTag")
+		.data(function(d) { return d.tags; })
+		.text(function(d) { return d.text; });
+
 	}
 	
 	// Painopisteiden mittarit
@@ -738,12 +1131,13 @@ function tavoitteet(rootFn, svgs, map) {
 		.attr("width", "" + a4ratio*30)
 		.attr("height", "" + painopisteMeterHeight)
 		.attr("rx", "1")
-		.on("click", function(d,i) { 
+        .on("click", function(d,i) { 
 			d3.event.stopPropagation();
-			rootFn.selectMeter(d.tavoite, d.painopiste, d.realIndex); 
+			rootFn.selectMeter(d.tavoite, d.painopiste, d.realIndex, d.link); 
 		})
 		.style("stroke", "#111")
-		.style("stroke-width", "0")
+		.style("stroke-width", 0)
+		.style("cursor", function(d,i) { return d.link.length > 0 ? "pointer" : "default"; })
 		.style("fill", function(d) { return d.color;})
 		.call(wrapFocus, painopisteWidth-2*textPad);
 
@@ -752,14 +1146,27 @@ function tavoitteet(rootFn, svgs, map) {
 		.attr("y", "9")
 		.on("click", function(d,i) { 
 			d3.event.stopPropagation();
-			rootFn.selectMeter(d.tavoite, d.painopiste, d.realIndex); 
+			rootFn.selectMeter(d.tavoite, d.painopiste, d.realIndex, d.link); 
 		})
-		.text(function(d,i) { return d.text; });
+		.style("cursor", function(d,i) { return d.link.length > 0 ? "pointer" : "default"; })
+		.on("mouseover", function(d,i) { 
+			if(d.link.length > 0) {
+				d3.select(this.previousSibling).style("stroke-width", 0.8); 
+			}})
+		.on("mouseout", function(d,i) { d3.select(this.previousSibling).style("stroke-width", 0); });
 
 		painopisteMeters.exit().remove();
 
+		meterG.selectAll("text.painopisteMeter")
+		.data(function(d,i) { return d.meters; })
+		.attr("data-link", function(d) { return d.link.length > 0 ? d.link : "_";})
+        .attr("data-meterDesc", function(d) { return d.desc; })
+		.text(function(d) { return d.text;});
+
 		meterG.selectAll("rect.painopisteMeter")
 		.data(function(d,i) { return d.meters; })
+		.attr("data-link", function(d) { return d.link.length > 0 ? d.link : "_";})
+        .attr("data-meterDesc", function(d) { return d.desc; })
 		.style("fill", function(d) { return d.color;});
 
 	}
@@ -818,7 +1225,7 @@ function wrapImpl(element, width, allowedNumberOfLines) {
 	lineNumber = 0;
 	allowedWidth = width;
 	while (word = words.pop()) {
-		tspan = text.append("tspan").attr("y", y).text(word+"\u00A0");
+		tspan = text.append("tspan")/*.attr("y", y)*/.text(word+"\u00A0");
 		if(firstSpan == null) firstSpan = tspan;
 		wordLength = tspan.node().getComputedTextLength();
 		lineLength += wordLength; 
@@ -843,7 +1250,7 @@ function wrapImpl(element, width, allowedNumberOfLines) {
 		}
 	}
 	text.attr("lineCount", lineNumber+1);
-	return { ln : lineNumber, span : firstSpan };
+	return { ln : (lineNumber+1), span : firstSpan };
 }
 
 function wrapVisio(text, width) {
@@ -865,8 +1272,20 @@ function wrapBrowseNode(text) {
 function wrapFocus(text, width) {
 	text.each(function() {
 		var result = wrapImpl(this, width, 10);
-		if(result.ln < 2 && result.span != null)
-			result.span.attr("dy", "0.3em");
+		if(result.ln == 1 && result.span != null)
+			result.span.attr("dy", "0.2em");
+	});
+}
+
+function wrapLine(text, width) {
+	text.each(function() {
+		var result = wrapImpl(this, width, 1);
+	});
+}
+
+function wrapLineN(text, width) {
+	text.each(function() {
+		var result = wrapImpl(this, width, 100);
 	});
 }
 
@@ -959,7 +1378,7 @@ function dragged(self, data, d) {
 	d.y = d.py = d3.event.y;
 	d.fixed = true;
 	
-	d3.select(self).select("rect.fixed").attr("display", null);
+	d3.select(self).select("text.fixed").style("display", null);
 
 	nodeMap[d.uuid] = {'x': d.x, 'y': d.y, 'px' : d.px, 'py:' : d.py, 'fixed' : d.fixed };
 	d3.select(self).attr("transform", "translate(" + d.x+ "," + d.y + ")");
@@ -1072,7 +1491,8 @@ function refreshBrowser(rootFn) {
 	enterNode.append("svg:rect").classed("outline", true);
 	enterNode.append("svg:rect").classed("status", true);
 	enterNode.append("svg:rect").classed("main", true);
-	enterNode.append("svg:rect").classed("fixed", true);
+	enterNode.append("svg:text").classed("fixed", true);
+	enterNode.append("svg:text").classed("required", true);
 	enterNode.append("svg:text").classed("browseName", true);
 	enterNode.append("svg:text").classed("description", true);
 
@@ -1086,7 +1506,7 @@ function refreshBrowser(rootFn) {
 		if(target.parentNode.parentNode == nodes) {
 			
 			var d = target.__data__;
-			d3.select(target.parentNode).select("rect.outline").attr("display", null);
+			d3.select(target.parentNode).select("rect.outline").style("display", null);
 			
 			var links = document.getElementsByClassName('browseLink');
 			for(var i=0;i<links.length;i++) {
@@ -1119,7 +1539,7 @@ function refreshBrowser(rootFn) {
 			}
 			
 			if(d.emph) return;
-			d3.select(target.parentNode).select("rect.outline").attr("display", "none");
+			d3.select(target.parentNode).select("rect.outline").style("display", "none");
 			
 		}
 		
@@ -1132,7 +1552,7 @@ function refreshBrowser(rootFn) {
 	.attr("y", -10)
 	.attr("rx", 10)
 	.attr("ry", 10)
-	.attr("display", function(d) { return  d.emph ? null : "none"; } )
+	.style("display", function(d) { return  d.emph ? null : "none"; } )
 	.style("stroke",function(d,i) { 
 		return d.color; 
 	})
@@ -1150,7 +1570,7 @@ function refreshBrowser(rootFn) {
 	})
 	.style("stroke-width", 6)
 	.attr("fill", "none")
-	.attr("cursor", "pointer")
+	.attr("cursor", "move")
 	.on("click", function(d) {
 		if (d3.event.defaultPrevented) return; // click suppressed
 		rootFn.select(d3.event.pageX, d3.event.pageY, d.uuid); 
@@ -1163,7 +1583,7 @@ function refreshBrowser(rootFn) {
 	.attr("y", 8)
 	.attr("rx", 3)
 	.attr("ry", 3)
-	.attr("cursor", "pointer")
+	.attr("cursor", "move")
 	.style("stroke", function(d) { return  d.circleFill; })
 	.style("stroke-width", 10)
 	.attr("fill", "#FFF" )
@@ -1172,22 +1592,30 @@ function refreshBrowser(rootFn) {
 		rootFn.select(d3.event.pageX, d3.event.pageY, d.uuid); 
 	});
 
-	node.select("rect.fixed")
-	.attr("x", function(d) { return  d.w-20; } )
-	.attr("y", function(d) { return  d.h-20; } )
-	.attr("width", 40)
-	.attr("height", 40)
-	.attr("rx", 2)
-	.attr("ry", 2)
+	node.select("text.fixed")
+	.attr("x", function(d) { return  d.w-45; } )
+	.attr("y", function(d) { return  d.h-15; } )
 	.attr("cursor", "pointer")
-	.style("stroke", function(d) { return  d.color; })
-	.style("stroke-width", 6)
-	.attr("fill", "#B22" )
-	.attr("display", function(d) { return d.fixed ? null : "none"; })
+	.text("\uf023")
+	.style("display", function(d) { return d.fixed ? null : "none"; })
 	.on("click", function(d) {
 		if (d3.event.defaultPrevented) return; // click suppressed
 		d.fixed = false;
-		d3.select(this).attr("display", "none");
+		d3.select(this).style("display", "none");
+		force.start();
+	});
+
+	node.select("text.required")
+	.attr("x", function(d) { return  15; } )
+	.attr("y", function(d) { return  d.h-15; } )
+	.attr("cursor", "pointer")
+	.style("font-size", "35px")
+	.text("\uf046")
+	.style("display", function(d) { return d.required ? null : "none"; })
+	.on("click", function(d) {
+		if (d3.event.defaultPrevented) return; // click suppressed
+		d.fixed = false;
+		d3.select(this).style("display", "none");
 		force.start();
 	});
 

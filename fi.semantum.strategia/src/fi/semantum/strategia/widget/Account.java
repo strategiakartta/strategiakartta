@@ -108,8 +108,10 @@ public class Account extends Base {
 	}
 
 	public boolean canWrite(Database database, Base b) {
+		if(isAdmin()) return true;
+		if(!TimeConfiguration.getInstance(database).canWrite(database, b)) return false;
 		Strategiakartta map = database.getMap(b);
-		if(map == null) return false;
+		if(map == null) return isAdmin();
 		for(Right r : rights) {
 			if(!r.write) continue;
 			if(r.recurse) {
@@ -126,6 +128,16 @@ public class Account extends Base {
 		for(Base b : database.objects.values()) {
 			if(b instanceof Account) result.add((Account)b);
 		}
+		return result;
+	}
+	
+	@Override
+	public boolean migrate(Main main) {
+		boolean result = false;
+		for(UIState s : uiStates) {
+			result |= s.migrate(main);
+		}
+		result |= super.migrate(main);
 		return result;
 	}
 	

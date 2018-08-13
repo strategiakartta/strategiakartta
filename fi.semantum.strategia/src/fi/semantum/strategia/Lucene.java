@@ -114,19 +114,17 @@ public class Lucene {
 		return new PerFieldAnalyzerWrapper(new LowerCaseWhitespaceAnalyzer(Version.LUCENE_4_9));
     }
     
-    private static Directory getDirectory() throws IOException {
-		File f = new File(".");
-		File dir = new File(f, "lucene");
+    private static Directory getDirectory(String databaseId) throws IOException {
+		File dir = new File(Main.baseDirectory(), "lucene-"+databaseId);
         return FSDirectory.open(dir);
     }
     
-    public static boolean indexExists() {
-		File f = new File(".");
-		File dir = new File(f, "lucene");
+    public static boolean indexExists(String databaseId) {
+		File dir = new File(Main.baseDirectory(), "lucene-"+databaseId);
 		return dir.exists();
     }
     
-    public static synchronized List<String> search(String search) throws IOException {
+    public static synchronized List<String> search(String databaseId, String search) throws IOException {
     	
     	ArrayList<String> result = new ArrayList<String>();
 
@@ -134,7 +132,7 @@ public class Lucene {
     	
     	try {
 
-    		reader = DirectoryReader.open(getDirectory());
+    		reader = DirectoryReader.open(getDirectory(databaseId));
     		IndexSearcher searcher = new IndexSearcher(reader);
 
     		QueryParser parser = new QueryParser(Version.LUCENE_4_9, "text", getAnalyzer());
@@ -178,9 +176,9 @@ public class Lucene {
 
     }
 
-    public static IndexWriter getWriter() throws IOException {
+    public static IndexWriter getWriter(String databaseId) throws IOException {
 
-    	Directory directory = getDirectory();
+    	Directory directory = getDirectory(databaseId);
 
 		IndexWriterConfig conf = new IndexWriterConfig(Version.LUCENE_4_9, getAnalyzer()).setOpenMode(OpenMode.CREATE_OR_APPEND);
 
@@ -218,8 +216,8 @@ public class Lucene {
 
     private static ThreadLocal<IndexWriter> writers = new ThreadLocal<IndexWriter>();
     
-    public static void startWrite() throws IOException {
-    	writers.set(getWriter());
+    public static void startWrite(String databaseId) throws IOException {
+    	writers.set(getWriter(databaseId));
     }
     
     public static void endWrite() {
@@ -233,7 +231,7 @@ public class Lucene {
     }
     
     
-    public static synchronized void set(String uuid, String text) throws IOException {
+    public static synchronized void set(String databaseId, String uuid, String text) throws IOException {
 
     	IndexWriter thread = writers.get();
     	if(thread != null) {
@@ -241,7 +239,7 @@ public class Lucene {
     		return;
     	}
     	
-    	Directory directory = getDirectory();
+    	Directory directory = getDirectory(databaseId);
 
 		IndexWriterConfig conf = new IndexWriterConfig(Version.LUCENE_4_9, getAnalyzer()).setOpenMode(OpenMode.CREATE_OR_APPEND);
 
@@ -263,11 +261,6 @@ public class Lucene {
     }
 
 	public static void main(String[] args) throws Exception {
-		
-		set("1", "aa jee");
-		set("2", "aa bee");
-		
-		search("aa");
 
 	}
 	

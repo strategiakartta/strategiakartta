@@ -11,35 +11,27 @@
 package fi.semantum.strategia.action;
 
 import fi.semantum.strategia.Main;
-import fi.semantum.strategia.Updates;
-import fi.semantum.strategia.Utils.Action;
 import fi.semantum.strategia.widget.Database;
+import fi.semantum.strategia.widget.Moveable;
 import fi.semantum.strategia.widget.Strategiakartta;
 import fi.semantum.strategia.widget.Tag;
 import fi.semantum.strategia.widget.Tavoite;
 
-public class MoveDown extends Action {
-
-	private Main main;
-	private Strategiakartta map;
-	private Tavoite goal;
+public class MoveDown extends ActionBase<Moveable> {
 	
-	public MoveDown(Main main, Tavoite goal) {
-		super("Siirrä alemmas");
-		this.main = main;
-		this.goal = goal;
-		this.map = main.getDatabase().getMap(goal);
+	public MoveDown(Main main, Moveable m) {
+		super("Siirrä alemmas", main, m);
 	}
 	
 	@Override
 	public void run() {
-		map.moveDown(goal);
-		Updates.updateJS(main, true);
+		base.moveDown(main);
 	}
 	
-	public boolean accept() {
+	public boolean accept(Tavoite goal) {
 
 		Database database = main.getDatabase();
+		Strategiakartta map = database.getMap(goal);
 		Tag voimavarat = database.getOrCreateTag(Tag.VOIMAVARAT);
 		if(goal.hasRelatedTag(database, voimavarat)) return false;
 

@@ -17,9 +17,11 @@ import com.vaadin.data.Property.ValueChangeEvent;
 import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.ui.AbstractField;
 import com.vaadin.ui.ComboBox;
+import com.vaadin.ui.themes.ValoTheme;
 
 import fi.semantum.strategia.Main;
 import fi.semantum.strategia.Utils.AbstractCommentCallback;
+import fi.semantum.strategia.Utils.CommentCallback;
 
 public class EnumerationDatatype extends Datatype {
 
@@ -54,15 +56,16 @@ public class EnumerationDatatype extends Datatype {
 	}
 	
 	@Override
-	public AbstractField<?> getEditor(final Main main, final Base base, final Indicator indicator) {
+	public AbstractField<?> getEditor(final Main main, final Base base, final Indicator indicator, final boolean forecast, final CommentCallback callback) {
 
-		final Object value = indicator.getValue();
+		final Object value = forecast ? indicator.getForecast() : indicator.getValue();
 		
 		final ComboBox combo = new ComboBox();
 		for(String s : enumeration) {
 			combo.addItem(s);
 		}
 		
+		combo.setStyleName(ValoTheme.COMBOBOX_TINY);
 		combo.select(value);
 		combo.setNullSelectionAllowed(false);
 		combo.setWidth("100%");
@@ -74,11 +77,19 @@ public class EnumerationDatatype extends Datatype {
 	
 				@Override
 				public void valueChange(ValueChangeEvent event) {
-					indicator.modifyValueWithComment(main, base, combo.getValue(), new AbstractCommentCallback() {
+					indicator.updateWithComment(main, base, combo.getValue(), forecast, new AbstractCommentCallback() {
 						
 						@Override
 						public void canceled() {
 							combo.select(value);
+							if(callback != null)
+								callback.canceled();
+						}
+						
+						@Override
+						public void runWithComment(String shortComment, String comment) {
+							if(callback != null)
+								callback.runWithComment(shortComment, comment);
 						}
 						
 					});
@@ -100,6 +111,11 @@ public class EnumerationDatatype extends Datatype {
 	
 	@Override
 	public Object getDefaultValue() {
+		return enumeration.get(0);
+	}
+	
+	@Override
+	public Object getDefaultForecast() {
 		return enumeration.get(0);
 	}
 	

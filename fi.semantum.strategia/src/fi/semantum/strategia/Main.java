@@ -18,19 +18,24 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import com.vaadin.annotations.PreserveOnRefresh;
 import com.vaadin.annotations.Theme;
 import com.vaadin.data.Property.ValueChangeEvent;
 import com.vaadin.data.Property.ValueChangeListener;
@@ -77,9 +82,14 @@ import com.vaadin.ui.Window.ResizeEvent;
 import com.vaadin.ui.Window.ResizeListener;
 import com.vaadin.ui.themes.ValoTheme;
 
+import fi.semantum.strategia.action.Actions;
+import fi.semantum.strategia.action.CreatePrincipalMeter;
 import fi.semantum.strategia.custom.OnDemandFileDownloader;
 import fi.semantum.strategia.custom.OnDemandFileDownloader.OnDemandStreamSource;
 import fi.semantum.strategia.custom.PDFButton;
+import fi.semantum.strategia.filter.FilterState;
+import fi.semantum.strategia.filter.NodeFilter;
+import fi.semantum.strategia.filter.SearchFilter;
 import fi.semantum.strategia.widget.Account;
 import fi.semantum.strategia.widget.Base;
 import fi.semantum.strategia.widget.Browser;
@@ -100,13 +110,14 @@ import fi.semantum.strategia.widget.Painopiste;
 import fi.semantum.strategia.widget.Property;
 import fi.semantum.strategia.widget.Strategiakartta;
 import fi.semantum.strategia.widget.Tavoite;
+import fi.semantum.strategia.widget.TimeConfiguration;
 
 @SuppressWarnings("serial")
 @Theme("fi_semantum_strategia")
-@PreserveOnRefresh
+//@PreserveOnRefresh
 public class Main extends UI {
 
-	public static String wikiPrefix = "LVM1_";
+	private static String wikiPrefix = "Strategiakartta_";
 
 	public static final String TOTEUTTAA = "Toteuttaa";
 
@@ -114,11 +125,39 @@ public class Main extends UI {
 	public Account account;
 	public String wikiToken;
 	public List<List<String>> propertyCells = new ArrayList<List<String>>();
-	public Window modalDialog = null;
 	public Window mapDialog = null;
+	
+	public ScheduledExecutorService background = Executors.newScheduledThreadPool(1);
 
-	UIState uiState = new UIState();
+	public UIState uiState = new UIState();
 
+	private static File baseDirectory = null;
+
+	public static File getAppFile(String path) {
+		File mf = new File(Main.class.getResource("Main.class").getFile());
+		File base = mf.getParentFile().getParentFile().getParentFile().getParentFile().getParentFile().getParentFile();
+		return new File(base, path);
+	}
+	
+	public static File baseDirectory() {
+		if(baseDirectory == null) {
+			String baseDirectoryPath = System.getenv("strategia_base_directory");
+			if(baseDirectoryPath == null)
+				baseDirectoryPath = "./strategia-db";
+			baseDirectory = new File(baseDirectoryPath);
+		}
+		return baseDirectory;
+	}
+
+	
+	public static String getWikiPrefix(Database database) {
+		if("database".equals(database.getDatabaseId())) {
+			return wikiPrefix;
+		} else {
+			return wikiPrefix + database.getDatabaseId() + "_";
+		}
+	}
+	
 	public Database getDatabase() {
 		return database;
 	}
@@ -131,13 +170,6 @@ public class Main extends UI {
 		return uiState;
 	}
 
-	public void closeDialog() {
-		if (modalDialog != null) {
-			removeWindow(modalDialog);
-			modalDialog = null;
-		}
-	}
-
 	public Account getAccountDefault() {
 		if (account != null)
 			return account;
@@ -145,16 +177,32 @@ public class Main extends UI {
 			return database.guest;
 	}
 
-	static class TimeInterval {
+	public static class TimeInterval {
+		
 		private static final TimeInterval ALWAYS = new TimeInterval(Integer.MIN_VALUE, Integer.MAX_VALUE);
-		public int startYear;
-		public int endYear;
+		
+		final public int startYear;
+		final public int endYear;
 
 		public TimeInterval(int start, int end) {
+			if(start < 2000)
+				start = 2000;
+			if(end > 2100)
+				end = 2100;
 			startYear = start;
 			endYear = end;
 		}
 
+		public boolean isSingle() {
+			return startYear == endYear;
+		}
+		
+		public Set<Integer> years() {
+			Set<Integer> result = new TreeSet<Integer>();
+			for(int i=startYear;i<=endYear;i++)
+				 result.add(i);
+			return result;
+		}
 		public boolean contains(String ref) {
 			try {
 				int year = Integer.parseInt(ref);
@@ -166,6 +214,8 @@ public class Main extends UI {
 
 		public static TimeInterval parse(String s) {
 			if (Property.AIKAVALI_KAIKKI.equals(s))
+				return ALWAYS;
+			if (s == null)
 				return ALWAYS;
 			int idx = s.lastIndexOf('-');
 			if (idx == -1) {
@@ -186,20 +236,26 @@ public class Main extends UI {
 				return ALWAYS;
 			}
 		}
+		
+		public boolean intersects(TimeInterval other) {
+			if(other.endYear < startYear) return false;
+			if(other.startYear > endYear) return false;
+			return true;
+		}
+		
 	}
 
 	public boolean acceptTime(String t) {
-
 		String ref = getUIState().time;
-		if (Property.AIKAVALI_KAIKKI.equals(ref))
-			return true;
-
-		TimeInterval interval = TimeInterval.parse(t);
-		return interval.contains(ref);
-
+		return Utils.acceptTime(t, ref);
 	}
 
 	public Map<String, UIState> fragments = new HashMap<String, UIState>();
+	public AbsoluteLayout abs;
+	public Button less;
+	public Button reportAllButton;
+	public Label reportStatus;
+	public boolean menuActive = false;
 
 	final D3 js = new D3();
 	final D3 js2 = new D3();
@@ -209,6 +265,9 @@ public class Main extends UI {
 	Button login;
 	Button duplicate;
 	Button duplicate2;
+	Label modeLabel;
+	Button mode;
+	Button meterMode;
 	PDFButton pdf;
 	Button propertyExcelButton;
 	final Browser browser_ = new Browser(new BrowserNode[0], new BrowserLink[0], 100, 100);
@@ -229,10 +288,8 @@ public class Main extends UI {
 	ComboBox states;
 	Button saveState;
 	Button more;
-	Button less;
 	Button hori;
 	ComboBox filter;
-	AbsoluteLayout abs;
 
 	boolean filterListenerActive = true;
 	ValueChangeListener filterListener = new ValueChangeListener() {
@@ -371,7 +428,7 @@ public class Main extends UI {
 
 		@Override
 		public void select(double x, double y) {
-			Utils.selectAction(main, x, y, null, getMap());
+			Actions.selectAction(main, x, y, null, getMap());
 		}
 
 		@Override
@@ -386,13 +443,38 @@ public class Main extends UI {
 		}
 
 		@Override
+		public void drill(int tavoite) {
+			Tavoite goal = getGoal(tavoite);
+			try {
+				Strategiakartta k = goal.getPossibleImplementationMap(main.getDatabase());
+				if (k != null) {
+					UIState s = main.getUIState().duplicate(main);
+					s.current = k;
+					main.setFragment(s, true);
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		@Override
 		public void navi(double x, double y, int tavoite) {
-			Utils.selectAction(main, x, y, getMap(), getGoal(tavoite));
+			Actions.selectAction(main, x, y, getMap(), getGoal(tavoite));
+//			if(main.getUIState().input) {
+//			} else {
+//				Tavoite goal = getGoal(tavoite);
+//				Strategiakartta k = goal.getImplementingSubmap(main.getDatabase());
+//				if (k != null) {
+//					UIState s = main.getUIState().duplicate(main);
+//					s.current = k;
+//					main.setFragment(s, true);
+//				}
+//			}
 		}
 
 		@Override
 		public void navi2(double x, double y, int tavoite, int painopiste) {
-			Utils.selectAction(main, x, y, getGoal(tavoite), getGoal(tavoite).painopisteet[painopiste]);
+			Actions.selectAction(main, x, y, getGoal(tavoite), getGoal(tavoite).painopisteet[painopiste]);
 		}
 
 		@Override
@@ -454,29 +536,15 @@ public class Main extends UI {
 			tf.setCursorPosition(tf.getValue().length());
 
 		}
-
-		@Override
-		public void selectMeter(int tavoite, int painopiste, int index) {
-
-			Base b = null;
-			if (painopiste == -1) {
-				b = getGoal(tavoite);
-			} else {
-				b = getGoal(tavoite).painopisteet[painopiste];
-			}
-
-			if (b == null)
-				return;
-
+		
+		private void editMeter(Base b, Meter m) {
+			
 			Database database = main.getDatabase();
-
+			
 			boolean canWrite = main.canWrite(getMap());
 
-			List<MeterDescription> descs = Meter.makeMeterDescriptions(main, b, true);
-
-			Meter m = descs.get(index).meter;
 			Indicator indicator = m.getPossibleIndicator(database);
-			if (canWrite && indicator != null) {
+			if (canWrite && indicator != null && main.getUIState().input) {
 
 				Datatype dt = indicator.getDatatype(database);
 				if (dt instanceof EnumerationDatatype) {
@@ -487,7 +555,7 @@ public class Main extends UI {
 			}
 
 			String id = m.getCaption(database);
-			String exp = m.describe(database);
+			String exp = m.describe(database, main.getUIState().forecastMeters);
 			Indicator i = m.getPossibleIndicator(database);
 			if (i != null) {
 				String shortComment = i.getValueShortComment();
@@ -496,8 +564,8 @@ public class Main extends UI {
 			}
 
 			String content = "<div style=\"width: 800px; border: 2px solid; padding: 5px\">";
-			content += "<div style=\"text-align: center; white-space:normal; font-size: 22px; padding: 5px\">" + id
-					+ "</div>";
+			/*content += "<div style=\"text-align: center; white-space:normal; font-size: 22px; padding: 5px\">" + id
+					+ "</div>";*/
 			content += "<div style=\"text-align: center; white-space:normal; font-size: 24px; padding: 15px\">" + exp
 					+ "</div>";
 			content += "</div>";
@@ -505,6 +573,61 @@ public class Main extends UI {
 			Notification n = new Notification(content, Notification.Type.HUMANIZED_MESSAGE);
 			n.setHtmlContentAllowed(true);
 			n.show(Page.getCurrent());
+			
+		}
+
+		@Override
+		public void selectMeter(int tavoite, int painopiste, int index, String link) {
+
+			Base b = null;
+			if (painopiste == -1) {
+				b = getGoal(tavoite);
+			} else {
+				b = getGoal(tavoite).painopisteet[painopiste];
+			}
+
+			if (b == null)
+				return;
+			
+			Database database = main.getDatabase();
+			
+			if(main.getUIState().useImplementationMeters) {
+				
+				boolean forecast = main.getUIState().forecastMeters;
+				
+				Base linked = database.find(link);
+				if(linked != null) {
+					UIState s = main.getUIState().duplicate(main);
+					s.current = (Strategiakartta)linked;
+					main.setFragment(s, true);
+					return;
+				}
+
+				boolean canWrite = main.canWrite(getMap());
+				if(canWrite) {
+					if(b instanceof Painopiste) {
+						Painopiste p = (Painopiste)b;
+						List<Meter> descs = p.getImplementationMeters(main, forecast);
+						if(descs.isEmpty()) {
+							Meter m = p.getPrincipalMeter(main, "", forecast);
+							if(m != null) descs = Collections.singletonList(m);
+						}
+						if(index < descs.size()) {
+							Meter m = descs.get(index);
+							if(!m.isTransient()) {
+								editMeter(b, m);
+							}
+						}
+					}
+				}
+				
+			} else {
+
+				List<MeterDescription> descs = Meter.makeMeterDescriptions(main, b, true);
+				Meter m = descs.get(index).meter;
+				editMeter(b, m);
+				
+			}
 
 		}
 
@@ -540,7 +663,87 @@ public class Main extends UI {
 			Updates.updateJS(main, true);
 		}
 
+		@Override
+		public void displayInfo(final int tavoite, final int painopiste) {
+
+			Database database = main.getDatabase();
+			
+			Painopiste p = getGoal(tavoite).painopisteet[painopiste];
+
+			Map<String,String> resp = Utils.getResponsibilityMap(database, p);
+			if(resp.isEmpty()) return;
+			
+			String content = "<div style=\"width: 825px; padding: 5px\">";
+			content +="<div style=\"text-align:center;margin:10px\">Vastuut</div>";
+			content +="<table style=\"border: 1px solid black;border-collapse: collapse\">";
+			for(String field : resp.keySet()) {
+				content += "<tr>";
+				content += "<td style=\"\"><div style=\"margin: 5px;width: 250px\">" + field + "</div></fd>";
+				String value = resp.get(field);
+				content += "<td style=\"border: 1px solid black;\"><div style=\"margin: 5px;width: 550px;white-space:normal\">" + value + "</div></fd>";
+				content += "</tr>";	
+			}
+			content += "</table>";
+			content += "</div>";
+
+			Notification n = new Notification(content, Notification.Type.HUMANIZED_MESSAGE);
+			n.setHtmlContentAllowed(true);
+			n.show(Page.getCurrent());
+
+		}
+		
+		@Override
+		public void displayMeter(final int tavoite, final int painopiste) {
+
+			Painopiste p = getGoal(tavoite).painopisteet[painopiste];
+			
+			// The unique leaf box
+			Base leaf = main.hasLeaf(p);
+			
+			for(Meter m : leaf.getMetersActive(main)) {
+				if(m.isPrincipal) {
+					Utils.setUserMeter(main, leaf, m);
+					return;
+				}
+			}
+			
+			CreatePrincipalMeter.perform(main, leaf);
+
+			for(Meter m : leaf.getMetersActive(main)) {
+				if(m.isPrincipal) {
+					Utils.setUserMeter(main, leaf, m);
+					return;
+				}
+			}
+
+		}
+
 	};
+	
+	private String validatePathInfo(String pathInfo) {
+		if(pathInfo.isEmpty()) return "database";
+		if(pathInfo.contains("/")) return "database";
+		if(pathInfo.length() > 32) return "database";
+		for(int i=0;i<pathInfo.length();i++) {
+			char c = pathInfo.charAt(i);
+			if(!Character.isJavaIdentifierPart(c)) return "database";
+		}
+		return pathInfo;
+	}
+	
+//	private String resolveDatabase(so) {
+//		String pathInfo = request.getPathInfo();
+//		if(pathInfo.startsWith("/")) pathInfo = pathInfo.substring(1);
+//		if(pathInfo.endsWith("/")) pathInfo = pathInfo.substring(0, pathInfo.length() - 1);
+//		return validatePathInfo(pathInfo);
+//	}
+	
+
+	@Override
+	protected void refresh(VaadinRequest request) {
+		super.refresh(request);
+	}
+	
 
 	@Override
 	protected void init(VaadinRequest request) {
@@ -550,6 +753,12 @@ public class Main extends UI {
 				applyFragment(source.getUriFragment(), true);
 			}
 		});
+		
+		String pathInfo = request.getPathInfo();
+		if(pathInfo.startsWith("/")) pathInfo = pathInfo.substring(1);
+		if(pathInfo.endsWith("/")) pathInfo = pathInfo.substring(0, pathInfo.length() - 1);
+
+		String databaseId = validatePathInfo(pathInfo);
 
 		setWindowWidth(Page.getCurrent().getBrowserWindowWidth(), Page.getCurrent().getBrowserWindowHeight());
 
@@ -574,12 +783,18 @@ public class Main extends UI {
 		Wiki.login(this);
 
 		// Make sure that the printing directory exists
-		new File("printing").mkdirs();
+		new File(Main.baseDirectory(), "printing").mkdirs();
 
-		database = Database.load(this);
+		database = Database.load(this, databaseId);
 		database.getOrCreateTag("Tavoite");
 		database.getOrCreateTag("Painopiste");
-		uiState.setCurrentMap((Strategiakartta) database.findByI("hallinnonala"));
+		
+		for(Strategiakartta map : Strategiakartta.enumerate(database)) {
+			Strategiakartta parent = map.getPossibleParent(database);
+			if(parent == null)
+				uiState.setCurrentMap(parent);
+		}
+		
 		if (uiState.getCurrentMap() == null)
 			uiState.setCurrentMap(database.getRoot());
 
@@ -596,7 +811,7 @@ public class Main extends UI {
 
 				if (database.checkChanges()) {
 					String curr = uiState.getCurrentMap().uuid;
-					database = Database.load(Main.this);
+					database = Database.load(Main.this, database.getDatabaseId());
 					uiState.setCurrentMap((Strategiakartta) database.find(curr));
 					Updates.updateJS(Main.this, false);
 				}
@@ -613,7 +828,7 @@ public class Main extends UI {
 			@Override
 			public void select(double x, double y, String uuid) {
 				Base b = database.find(uuid);
-				Utils.selectAction(Main.this, x, y, null, b);
+				Actions.selectAction(Main.this, x, y, null, b);
 			}
 
 			@Override
@@ -625,7 +840,6 @@ public class Main extends UI {
 				account.uiStates.add(state);
 
 				Updates.update(Main.this, true);
-				closeDialog();
 
 			}
 
@@ -639,7 +853,85 @@ public class Main extends UI {
 				Updates.updateJS(Main.this, false);
 			}
 		});
+		
+		modeLabel = new Label("Katselutila");
+		modeLabel.setWidth("95px");
+		modeLabel.addStyleName("viewMode");
+		
+		mode = new Button();
+		mode.setDescription("Siirry tiedon syöttötilaan");
+		mode.setIcon(FontAwesome.EYE);
+		mode.addStyleName(ValoTheme.BUTTON_TINY);
 
+		mode.addClickListener(new ClickListener() {
+
+			@Override
+			public void buttonClick(ClickEvent event) {
+				
+				if("Siirry tiedon syöttötilaan".equals(mode.getDescription())) {
+					
+					mode.setDescription("Siirry katselutilaan");
+					mode.setIcon(FontAwesome.PENCIL);
+					modeLabel.setValue("Syöttötila");
+					modeLabel.removeStyleName("viewMode");
+					modeLabel.addStyleName("editMode");
+
+					UIState s = uiState.duplicate(Main.this);
+					s.input = true;
+					setFragment(s, true);
+					
+				} else {
+					
+					mode.setDescription("Siirry tiedon syöttötilaan");
+					mode.setIcon(FontAwesome.EYE);
+					modeLabel.setValue("Katselutila");
+					modeLabel.removeStyleName("editMode");
+					modeLabel.addStyleName("viewMode");
+
+					UIState s = uiState.duplicate(Main.this);
+					s.input = false;
+					setFragment(s, true);
+					
+				}
+
+			}
+
+		});
+
+		meterMode = new Button();
+		meterMode.setDescription("Vaihda toteumamittareihin");
+		meterMode.setCaption("Ennuste");
+		meterMode.addStyleName(ValoTheme.BUTTON_TINY);
+
+		meterMode.addClickListener(new ClickListener() {
+
+			@Override
+			public void buttonClick(ClickEvent event) {
+				
+				if("Vaihda toteumamittareihin".equals(meterMode.getDescription())) {
+					
+					meterMode.setDescription("Vaihda ennustemittareihin");
+					meterMode.setCaption("Toteuma");
+
+					UIState s = uiState.duplicate(Main.this);
+					s.setActualMeters();
+					setFragment(s, true);
+					
+				} else {
+
+					meterMode.setDescription("Vaihda toteumamittareihin");
+					meterMode.setCaption("Ennuste");
+
+					UIState s = uiState.duplicate(Main.this);
+					s.setForecastMeters();
+					setFragment(s, true);
+					
+				}
+
+			}
+
+		});
+		
 		pdf = new PDFButton();
 		pdf.setDescription("Tallenna kartta PDF-muodossa");
 		pdf.setIcon(FontAwesome.PRINT);
@@ -672,7 +964,8 @@ public class Main extends UI {
 			public InputStream getStream() {
 				
 				String uuid = UUID.randomUUID().toString();
-				f = new File("printing", uuid+".xlsx"); 
+				File printing = new File(Main.baseDirectory(), "printing");
+				f = new File(printing, uuid+".xlsx"); 
 				
 				Workbook w = new XSSFWorkbook();
 				Sheet sheet = w.createSheet("Sheet1");
@@ -765,7 +1058,7 @@ public class Main extends UI {
 				try {
 
 					Map<String, String> content = new HashMap<String, String>();
-					List<String> hits = Lucene.search(text + "*");
+					List<String> hits = Lucene.search(database.getDatabaseId(), text + "*");
 					for (String uuid : hits) {
 						Base b = database.find(uuid);
 						if (b != null) {
@@ -957,7 +1250,7 @@ public class Main extends UI {
 					Updates.update(Main.this, true);
 					login.setCaption("Kirjaudu");
 				} else {
-					Utils.login(Main.this);
+					Login.login(Main.this);
 				}
 			}
 
@@ -1006,6 +1299,18 @@ public class Main extends UI {
 		hl0.setComponentAlignment(search, Alignment.MIDDLE_LEFT);
 		hl0.setExpandRatio(search, 1.0f);
 
+		hl0.addComponent(modeLabel);
+		hl0.setComponentAlignment(modeLabel, Alignment.MIDDLE_LEFT);
+		hl0.setExpandRatio(modeLabel, 0.0f);
+
+		hl0.addComponent(mode);
+		hl0.setComponentAlignment(mode, Alignment.MIDDLE_LEFT);
+		hl0.setExpandRatio(mode, 0.0f);
+
+		hl0.addComponent(meterMode);
+		hl0.setComponentAlignment(meterMode, Alignment.MIDDLE_LEFT);
+		hl0.setExpandRatio(meterMode, 0.0f);
+
 		hl0.addComponent(hallinnoi);
 		hl0.setComponentAlignment(hallinnoi, Alignment.MIDDLE_LEFT);
 		hl0.setExpandRatio(hallinnoi, 0.0f);
@@ -1047,19 +1352,22 @@ public class Main extends UI {
 			panel = new Panel();
 			panel.addStyleName(ValoTheme.PANEL_BORDERLESS);
 			panel.setSizeFull();
+			panel.setId("mapContainer1");
 			panelLayout = new VerticalLayout();
 			panelLayout.addComponent(js);
+			panelLayout.setHeight("100%");
 
 			js2Container = new VerticalLayout();
+			js2Container.setHeight("100%");
 			js2Container.addComponent(new Label("<hr />", ContentMode.HTML));
 			js2Container.addComponent(js2);
-
+			
 			panel.setContent(panelLayout);
 			tabs.addComponent(panel);
 		}
 
 		wiki = new BrowserFrame();
-		wiki.setSource(new ExternalResource("https://www.simupedia.com/strategiakartta/"));
+		wiki.setSource(new ExternalResource(Wiki.wikiAddress() + "/"));
 		wiki.setWidth("100%");
 		wiki.setHeight("100%");
 
@@ -1171,6 +1479,28 @@ public class Main extends UI {
 
 		});
 
+		reportAllButton = new Button();
+		reportAllButton.setCaption("Näkyvät tulokset");
+		reportAllButton.addStyleName(ValoTheme.BUTTON_TINY);
+		reportAllButton.addClickListener(new ClickListener() {
+
+			@Override
+			public void buttonClick(ClickEvent event) {
+				if (uiState.reportAll) {
+					reportAllButton.setCaption("Näkyvät tulokset");
+					uiState.reportAll = false;
+				} else {
+					reportAllButton.setCaption("Kaikki tulokset");
+					uiState.reportAll = true;
+				}
+				Updates.updateJS(Main.this, false);
+			}
+
+		});
+		
+		reportStatus = new Label("0 tulosta.");
+		reportStatus.setWidth("100px");
+
 		filter = new ComboBox();
 		filter.setWidth("100%");
 		filter.addStyleName(ValoTheme.COMBOBOX_SMALL);
@@ -1190,6 +1520,14 @@ public class Main extends UI {
 		browserWidgets.addComponent(less);
 		browserWidgets.setComponentAlignment(less, Alignment.MIDDLE_LEFT);
 		browserWidgets.setExpandRatio(less, 0.0f);
+
+		browserWidgets.addComponent(reportAllButton);
+		browserWidgets.setComponentAlignment(reportAllButton, Alignment.MIDDLE_LEFT);
+		browserWidgets.setExpandRatio(reportAllButton, 0.0f);
+
+		browserWidgets.addComponent(reportStatus);
+		browserWidgets.setComponentAlignment(reportStatus, Alignment.MIDDLE_LEFT);
+		browserWidgets.setExpandRatio(reportStatus, 0.0f);
 
 		browserWidgets.addComponent(filter);
 		browserWidgets.setComponentAlignment(filter, Alignment.MIDDLE_LEFT);
@@ -1263,12 +1601,12 @@ public class Main extends UI {
 
 	}
 
-	void switchToMap() {
+	public void switchToMap() {
 		setTabState(uiState, UIState.MAP);
 		Updates.update(this, false);
 	}
 
-	void switchToBrowser() {
+	public void switchToBrowser() {
 		setTabState(uiState, UIState.BROWSER);
 		Updates.update(this, false);
 	}
@@ -1278,7 +1616,7 @@ public class Main extends UI {
 		Updates.update(this, false);
 	}
 
-	void switchToProperties() {
+	public void switchToProperties() {
 		setTabState(uiState, UIState.PROPERTIES);
 		Updates.update(this, false);
 	}
@@ -1306,7 +1644,7 @@ public class Main extends UI {
 
 	}
 
-	void setCurrentItem(Base item, Strategiakartta position) {
+	public void setCurrentItem(Base item, Strategiakartta position) {
 
 		UIState state = uiState.duplicate(Main.this);
 		state.currentItem = item;
@@ -1315,18 +1653,57 @@ public class Main extends UI {
 
 	}
 
+	public void addRequiredItem(Base item) {
 
+		UIState state = uiState.duplicate(Main.this);
+		if(state.requiredItems == null) state.requiredItems = new HashSet<Base>();
+		state.requiredItems.add(item);
+		setFragment(state, true);
+
+	}
+
+	public void removeRequiredItem(Base item) {
+
+		UIState state = uiState.duplicate(Main.this);
+		if(state.requiredItems == null) state.requiredItems = new HashSet<Base>();
+		state.requiredItems.remove(item);
+		setFragment(state, true);
+
+	}
+
+	
 	public String dialogWidth() {
-		return (windowWidth / 2) + "px";
+		return dialogWidth(0.5);
+	}
+
+	public String dialogWidth(double ratio) {
+		return (ratio * windowWidth) + "px";
 	}
 
 	public String dialogHeight() {
-		return (windowHeight / 2) + "px";
+		return dialogHeight(0.5);
+	}
+	
+	public String dialogHeight(double ratio) {
+		return (ratio * windowHeight) + "px";
 	}
 
 	public boolean canWrite(Base b) {
 		Account account = getAccountDefault();
 		return account.canWrite(database, b);
 	}
+	
+	public Base hasLeaf(Base b) {
+		return b.hasLeaf(database, getUIState().time);
+	}
 
+	public boolean isLeaf(Base b) {
+		return b.isLeaf(database, getUIState().time);
+	}
+	
+	public boolean canWriteWithSelectedTime() {
+		String currentTime = getUIState().time; 
+		return TimeConfiguration.getInstance(database).canWrite(currentTime);
+	}
+	
 }

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import fi.semantum.strategia.Main;
+import fi.semantum.strategia.Main.TimeInterval;
 import fi.semantum.strategia.Utils;
 
 public class TavoiteVis {
@@ -29,6 +30,7 @@ public class TavoiteVis {
 	public double yOffset = 0.0; // In pixels
 	public boolean copy;
 	public boolean stripes;
+	public boolean drill = false;
 	public PainopisteVis[] painopisteet = new PainopisteVis[0];
 	public TagVis[] tags = new TagVis[0];
 	public MeterVis[] meters = new MeterVis[0];
@@ -41,7 +43,17 @@ public class TavoiteVis {
 		boolean isVoimavarat = t.hasRelatedTag(database, voimavarat);
 		
 		uuid = t.uuid;
-		id = t.getId(database);
+		
+		id = map.tavoiteDescription;
+		TimeInterval ti = TimeInterval.parse(main.getUIState().time);
+		boolean showTimes = ti.startYear != ti.endYear;
+		
+		if(showTimes) {
+			Property aika = Property.find(main.getDatabase(), Property.AIKAVALI);
+			String a = aika.getPropertyValue(t);
+			id += " " + a;
+		}
+		
 		text = t.text;
 		color = map.tavoiteColor;
 		realIndex = index;
@@ -49,6 +61,13 @@ public class TavoiteVis {
 		if(isVoimavarat) {
 			id = "";
 			text = "Voimavarat";
+		}
+		
+		try {
+			Strategiakartta k = t.getPossibleImplementationMap(main.getDatabase());
+			drill = (k != null);
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 		
 		ArrayList<PainopisteVis> pps = new ArrayList<PainopisteVis>();
@@ -59,18 +78,8 @@ public class TavoiteVis {
 			
 			List<TagVis> tagNames = new ArrayList<TagVis>();
 			for(Tag monitorTag : main.getUIState().shownTags) {
-				double value = monitorTag.getCoverage(database, t);
-				if(value > 0)
-					tagNames.add(new TagVis(monitorTag, value));
-				else {
-					for(Base b : Utils.getImplementationSet(database, t)) {
-						if(b.getRelatedTags(database).contains(monitorTag)) {
-							tagNames.add(new TagVis(monitorTag, 1.0));
-							continue;
-						}
-					}
-				}
-					
+				double value = TagVis.computeCoverage(main, monitorTag, t);
+				if(value > 0) tagNames.add(new TagVis(monitorTag, value));
 			}
 			this.tags = tagNames.toArray(new TagVis[tagNames.size()]);
 			
@@ -81,9 +90,9 @@ public class TavoiteVis {
 			String a = aika.getPropertyValue(p);
 			if(a != null) {
 				if(main.acceptTime(a))
-					pps.add(new PainopisteVis(main, map, t, realIndex, p, i));
+					pps.add(new PainopisteVis(main, map, t, showTimes, realIndex, p, i));
 			} else {
-				pps.add(new PainopisteVis(main, map, t, realIndex, p, i));
+				pps.add(new PainopisteVis(main, map, t, showTimes, realIndex, p, i));
 			}
 		}
 
@@ -93,30 +102,49 @@ public class TavoiteVis {
        	Pair p = implementsRelation.getPossibleRelation(t);
        	copy = p != null;
        	
-       	if(p != null) {
-       		Base owner = database.find(p.second);
-           	if(owner instanceof Painopiste) {
-           		Tavoite ownerT = database.getTavoite((Painopiste)owner);
-           		id = ownerT.getId(database) + ": " + id;
-           	}
-       	}
+       	String content = t.getText(database);
+       	if(content.isEmpty()) content = t.getId(database);
+
+       	text = content;
        	
-       	stripes = !copy;
+       	stripes = map.linkWithParent && !copy;
        	
        	if(database.getRoot().equals(map))
        		stripes = false;
        	
        	if(main.getUIState().showMeters) {
-			List<MeterDescription> descs = Meter.makeMeterDescriptions(main, t, true);
-    		meters = new MeterVis[descs.size()];
-    		for(int i=0;i<descs.size();i++) {
-    			MeterDescription desc = descs.get(i);
-    			Meter m = desc.meter;
-    			String color = m.getTrafficColor(database);
-    			String id = desc.meter.getId(database);
-    			if(id.isEmpty()) id = desc.numbering;
-    			meters[i] = new MeterVis(id, color, realIndex, -1, i);
-    		}
+
+           	boolean forecast = main.getUIState().forecastMeters;
+
+       		if(main.getUIState().useImplementationMeters) {
+       			
+       			Meter m = t.getPrincipalMeter(main, "", forecast);
+       			if(m.isPrincipal) {
+           			meters = new MeterVis[2];
+           			Meter imp = t.getImplementationMeter(main, "", forecast);
+           			double value = imp.value(database, forecast);
+           			meters[0] = new MeterVis("Arvio", m.getTrafficColor(database), realIndex, -1, 0, "");
+           			meters[1] = new MeterVis("" + (int)(100.0*value) + "%", imp.getTrafficColor(database), realIndex, -1, 1, "");
+       			} else {
+           			meters = new MeterVis[1];
+           			double value = m.value(database, forecast);
+           			String id = "" + (int)(100.0*value) + "%";
+           			String color = m.getTrafficColor(database, forecast);
+           			meters[0] = new MeterVis(id, color, realIndex, -1, 0, "");
+       			}
+       		} else {
+       			List<MeterDescription> descs = Meter.makeMeterDescriptions(main, t, true);
+        		meters = new MeterVis[descs.size()];
+        		for(int i=0;i<descs.size();i++) {
+        			MeterDescription desc = descs.get(i);
+        			Meter m = desc.meter;
+        			String color = m.getTrafficColor(database, forecast);
+        			String id = desc.meter.getId(database);
+        			if(id.isEmpty()) id = desc.numbering;
+        			meters[i] = new MeterVis(id, color, realIndex, -1, i, "");
+        		}
+       		}
+			
        	}
        	
 		if(isVoimavarat) {

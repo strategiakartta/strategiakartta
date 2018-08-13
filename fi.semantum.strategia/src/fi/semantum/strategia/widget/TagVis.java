@@ -10,6 +10,9 @@
  *******************************************************************************/
 package fi.semantum.strategia.widget;
 
+import fi.semantum.strategia.Main;
+import fi.semantum.strategia.Utils;
+
 public class TagVis {
 
 	public String text;
@@ -24,4 +27,25 @@ public class TagVis {
 		fillRatio = coverage;
 	}
 
+	public static double computeCoverage(Main main, Tag monitorTag, Base b) {
+		Database database = main.getDatabase();
+		double value = monitorTag.getCoverage(main, b);
+		if(value > 0) {
+			return 1.0;
+		} else {
+			for(Base b2 : Utils.getImplementationSet(database, b)) {
+				if(b2.getRelatedTags(database).contains(monitorTag)) {
+					return 1.0;
+				}
+				if(b2 instanceof Painopiste) {
+					Tavoite t2 = ((Painopiste)b2).getGoal(database);
+					if(t2.getRelatedTags(database).contains(monitorTag)) {
+						return 1.0;
+					}
+				}
+			}
+		}
+		return 0.0;
+	}
+	
 }

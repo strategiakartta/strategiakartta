@@ -19,8 +19,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.poi.ss.usermodel.Cell;
@@ -49,10 +51,15 @@ import com.vaadin.ui.Label;
 import com.vaadin.ui.TextField;
 import com.vaadin.ui.themes.ValoTheme;
 
-import fi.semantum.strategia.FilterState.ReportCell;
 import fi.semantum.strategia.Main.TreeVisitor1;
 import fi.semantum.strategia.custom.OnDemandFileDownloader;
 import fi.semantum.strategia.custom.OnDemandFileDownloader.OnDemandStreamSource;
+import fi.semantum.strategia.filter.FilterState;
+import fi.semantum.strategia.filter.FilterState.ReportCell;
+import fi.semantum.strategia.filter.GenericImplementationFilter;
+import fi.semantum.strategia.filter.NodeFilter;
+import fi.semantum.strategia.filter.QueryFilter;
+import fi.semantum.strategia.filter.TulostavoiteToimenpideFilter;
 import fi.semantum.strategia.widget.Account;
 import fi.semantum.strategia.widget.Base;
 import fi.semantum.strategia.widget.BrowserLink;
@@ -112,35 +119,46 @@ public class Updates {
 		if(current != null)
 			availableFilters.add(current);
 		
-		availableFilters.add(new TulostavoiteToimenpideFilter(main, uiState.currentItem, uiState.currentPosition));
+		List<String> cols = new ArrayList<String>();
+		cols.add("Strateginen tavoite");
+		cols.add("Painopiste");
+		cols.add("$Kartta");
+		cols.add("Tulostavoite");
+		cols.add("Mittari");
+		cols.add("Tavoitetaso");
+		cols.add("Tavoitetason m‰‰rittely");
+		cols.add("$Mittari");
+
+		availableFilters.add(new GenericImplementationFilter(main, uiState.currentItem, cols));
+//		availableFilters.add(new TulostavoiteToimenpideFilter(main, uiState.currentItem, uiState.currentPosition));
 
 		if (uiState.currentItem instanceof Strategiakartta) {
 
-			availableFilters.add(new MeterFilter(main,
-					uiState.currentItem, uiState.currentPosition));
-			availableFilters.add(new TulostavoiteFilter(main,
-					uiState.currentItem, uiState.currentPosition));
+//			availableFilters.add(new MeterFilter(main,
+//					uiState.currentItem, uiState.currentPosition));
+//			availableFilters.add(new TulostavoiteFilter(main,
+//					uiState.currentItem, uiState.currentPosition));
 
 		} else if (uiState.currentItem instanceof Tavoite) {
 
-			availableFilters.add(new MeterFilter(main,
-					uiState.currentItem, uiState.currentPosition));
-			availableFilters.add(new TulostavoiteFilter(main,
-					uiState.currentItem, uiState.currentPosition));
+//			availableFilters.add(new MeterFilter(main,
+//					uiState.currentItem, uiState.currentPosition));
+//			availableFilters.add(new TulostavoiteFilter(main,
+//					uiState.currentItem, uiState.currentPosition));
 
 		} else if (uiState.currentItem instanceof Painopiste) {
 
-			availableFilters.add(new MeterFilter(main,
-					uiState.currentItem, uiState.currentPosition));
-			availableFilters.add(new TulostavoiteFilter(main,
-					uiState.currentItem, uiState.currentPosition));
+//			availableFilters.add(new MeterFilter(main,
+//					uiState.currentItem, uiState.currentPosition));
+//			availableFilters.add(new TulostavoiteFilter(main,
+//					uiState.currentItem, uiState.currentPosition));
 
 		}
 
-		availableFilters.add(new ChangeFilter(main));
+//		availableFilters.add(new ChangeFilter(main));
 
-		if(account != null)
-			availableFilters.add(new AccountFilter(main, account));
+//		if(account != null)
+//			availableFilters.add(new AccountFilter(main, account));
 		
 		for (NodeFilter f : availableFilters) {
 			filter.addItem(f.toString());
@@ -159,7 +177,7 @@ public class Updates {
 		}
 		
 		if(newFilter == null) {
-			newFilter = new TulostavoiteToimenpideFilter(main, uiState.current, uiState.currentPosition);
+			newFilter = new TulostavoiteToimenpideFilter(main, uiState.current);
 			filter.select(filter.getNullSelectionItemId());
 			filter.setInputPrompt("valitse hakuehto");
 		} else {
@@ -217,21 +235,21 @@ public class Updates {
 		
 		main.getUIState().current.prepare(main);
 		
-		MapVis vis = new MapVis(main, main.getUIState().current, true);
+		MapVis vis = new MapVis(main, main.getUIState().current, "map", true);
 		vis.fixRows();
-		main.js.update(vis, main.windowWidth, Account.canWrite(main, main.getUIState().current));
+		main.js.update(vis, main.windowWidth, Account.canWrite(main, main.getUIState().current), main.getUIState().input);
 		
 		if(main.getUIState().reference != null) {
-			vis = new MapVis(main, main.getUIState().reference, false);
+			vis = new MapVis(main, main.getUIState().reference, "map2", false);
 			vis.fixRows();
 			main.js2Container.setVisible(true);
 			if(main.mapDialog != null) {
-				main.js2.update(vis, (int)main.mapDialog.getWidth(), Account.canWrite(main, main.getUIState().reference));
+				main.js2.update(vis, (int)main.mapDialog.getWidth(), Account.canWrite(main, main.getUIState().reference), main.getUIState().input);
 			} else {
-				main.js2.update(vis, main.windowWidth, Account.canWrite(main, main.getUIState().reference));
+				main.js2.update(vis, main.windowWidth, Account.canWrite(main, main.getUIState().reference), main.getUIState().input);
 			}
 		} else{
-			main.js2.update(null, main.windowWidth, false);
+			main.js2.update(null, main.windowWidth, false, false);
 			main.js2Container.setVisible(false);
 		}
 
@@ -241,11 +259,43 @@ public class Updates {
 	public static void updateBrowser(Main main, boolean setPositions) {
 
 		final Database database = main.getDatabase();
+		
+		if(main.getUIState().requiredItems == null)
+			main.getUIState().requiredItems = new HashSet<Base>();
 
 		TreeVisitor1 treeVisitor1 = main.new TreeVisitor1();
 		main.getUIState().getCurrentFilter().reset(treeVisitor1.filterState);
 		treeVisitor1.visit(database.getRoot());
 		
+		long s1 = System.nanoTime();
+		
+		// Filter reject
+		List<List<Base>> preAccept = new ArrayList<List<Base>>();
+		preAccept.addAll(treeVisitor1.filterState.getAcceptedNodes());
+		
+		long s2 = System.nanoTime();
+		
+		for(List<Base> path : preAccept)
+			if(main.getUIState().getCurrentFilter().reject(path))
+				treeVisitor1.filterState.reject(path);
+
+		// Remove internals
+		preAccept = new ArrayList<List<Base>>(treeVisitor1.filterState.getAcceptedNodes());
+		Set<Base> internals = new HashSet<Base>();
+		for(List<Base> path : preAccept) {
+			for(int i=0;i<path.size()-1;i++)
+				internals.add(path.get(i));
+		}
+		for(List<Base> path : preAccept) {
+			if(path.size() == 0) continue;
+			Base last = path.get(path.size()-1);
+			if(internals.contains(last)) 
+				treeVisitor1.filterState.reject(path);
+		}
+
+		long s3 = System.nanoTime();
+//		System.err.println("reject: " + (1e-6*(s3-s2) + "ms."));
+
 		treeVisitor1.filterState.process(main.getUIState().getCurrentFilter(), setPositions);
 
 		ArrayList<BrowserNode> ns = new ArrayList<BrowserNode>();
@@ -333,7 +383,7 @@ public class Updates {
 			for(Map.Entry<String,ReportCell> entry : map.entrySet()) {
 				@SuppressWarnings("unchecked")
 				com.vaadin.data.Property<String> p = container.getContainerProperty(item, entry.getKey());
-				p.setValue(entry.getValue().id);
+				p.setValue(entry.getValue().get());
 			}
 			
 		}
@@ -399,7 +449,8 @@ public class Updates {
 			public InputStream getStream() {
 				
 				String uuid = UUID.randomUUID().toString();
-				f = new File("printing", uuid+".xlsx"); 
+				File printing = new File(Main.baseDirectory(), "printing");
+				f = new File(printing, uuid+".xlsx"); 
 				
 				Workbook w = new XSSFWorkbook();
 				Sheet sheet = w.createSheet("Sheet1");
@@ -420,11 +471,7 @@ public class Updates {
 					for(int i=0;i<keys.size();i++) {
 						Cell cell = r.createCell(column++);
 						ReportCell rc = map.get(keys.get(i));
-						if(rc.id.equals(rc.caption)) {
-							cell.setCellValue(rc.id);
-						} else {
-							cell.setCellValue(rc.caption);
-						}
+						cell.setCellValue(rc.getLong());
 					}
 					
 				}

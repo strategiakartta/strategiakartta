@@ -29,13 +29,46 @@ public class Email {
 		send(emails, "Tiedote", "T‰rke‰‰ tietoa!");
 	}
 
+	private static String smtp_localhost = null;
+	public static String smtpLocalhost() {
+		if(smtp_localhost == null) {
+			smtp_localhost = System.getenv("strategia_smtp_localhost"); 
+			if(smtp_localhost == null) {
+				smtp_localhost = "www.digitulosohjaus.fi";
+			}
+		}
+		return smtp_localhost;
+	}
+	
+	private static String smtp_host = null;
+	public static String smtpHost() {
+		if(smtp_host == null) {
+			smtp_host = System.getenv("strategia_smtp_host"); 
+			if(smtp_host == null) {
+				smtp_host = "-";
+			}
+		}
+		return smtp_host;
+	}
+
+	private static String smtp_from = null;
+	public static String smtpFrom() {
+		if(smtp_from == null) {
+			smtp_from = System.getenv("strategia_smtp_from"); 
+			if(smtp_from == null) {
+				smtp_from = "strategia@digitulosohjaus.fi";
+			}
+		}
+		return smtp_from;
+	}
+
 	public static void send(String[] emails, String subject, String body) throws MessagingException {
 	
 		  Properties mailProps = new Properties();
 		  
-		  mailProps.put("mail.smtp.localhost", "www.simupedia.com");
-	      mailProps.put("mail.smtp.from", "strategiakartta@simupedia.com");
-	      mailProps.put("mail.smtp.host", "mail.kolumbus.fi");
+		  mailProps.put("mail.smtp.localhost", smtpLocalhost());
+	      mailProps.put("mail.smtp.from", smtpFrom());
+	      mailProps.put("mail.smtp.host", smtpHost());
 	      mailProps.put("mail.smtp.port", 25);
 	      mailProps.put("mail.smtp.auth", false);
 	      

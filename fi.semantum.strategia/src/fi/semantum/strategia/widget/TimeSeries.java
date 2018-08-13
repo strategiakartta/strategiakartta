@@ -33,8 +33,8 @@ public class TimeSeries implements Serializable {
 		return datatype;
 	}
 	
-	void addValue(Object value, Account account, String shortComment, String comment) {
-		TimeSeriesEntry entry = new TimeSeriesEntry(value, account, shortComment, comment);
+	void addValue(Object value, Object estimate, Account account, String shortComment, String comment) {
+		TimeSeriesEntry entry = new TimeSeriesEntry(value, estimate, account, shortComment, comment);
 		values.put(new Date(), entry);
 	}
 	
@@ -44,6 +44,15 @@ public class TimeSeries implements Serializable {
 		Map.Entry<Date,TimeSeriesEntry> entry = values.floorEntry(now);
 		if(entry == null) return null;
 		return entry.getValue().getValue();
+
+	}
+
+	Object getLastForecast() {
+		
+		Date now = new Date();
+		Map.Entry<Date,TimeSeriesEntry> entry = values.floorEntry(now);
+		if(entry == null) return null;
+		return entry.getValue().getForecast();
 
 	}
 

@@ -30,7 +30,8 @@ public class D3 extends AbstractJavaScriptComponent {
 	public interface D3Listener {
 		void navigate(String kartta);
 		void select(double x, double y);
-		void selectMeter(int tavoite, int painopiste, int index);
+		void selectMeter(int tavoite, int painopiste, int index, String link);
+		void drill(int tavoite);
 		void navi(double x, double y, int tavoite);
 		void navi2(double x, double y, int tavoite, int painopiste);
 		void editHeader();
@@ -38,6 +39,8 @@ public class D3 extends AbstractJavaScriptComponent {
 		void editTavoite(int index);
 		void editPainopiste(int tavoite, int painopiste);
 		void removeTavoite(int index);
+		void displayInfo(int tavoite, int painopiste);
+		void displayMeter(int tavoite, int painopiste);
 	}
 	
 	private ArrayList<D3Listener> listeners = new ArrayList<D3Listener>();
@@ -68,6 +71,17 @@ public class D3 extends AbstractJavaScriptComponent {
 			@Override
 			public void call(JsonArray arguments) throws JSONException {
 				for(D3Listener listener : listeners) listener.select(asDouble(arguments, 0), asDouble(arguments, 1));
+			}
+			
+		});
+		addFunction("drill", new JavaScriptFunction() {
+			
+			private static final long serialVersionUID = -8172758366004562840L;
+
+			@Override
+			public void call(JsonArray arguments) throws JSONException {
+				for(D3Listener listener : listeners)
+					listener.drill(asInteger(arguments, 0));
 			}
 			
 		});
@@ -122,7 +136,7 @@ public class D3 extends AbstractJavaScriptComponent {
 			@Override
 			public void call(JsonArray arguments) throws JSONException {
 				for(D3Listener listener : listeners)
-					listener.selectMeter(asInteger(arguments, 0),asInteger(arguments, 1),asInteger(arguments, 2));
+					listener.selectMeter(asInteger(arguments, 0),asInteger(arguments, 1),asInteger(arguments, 2),arguments.get(3).asString());
 			}
 			
 		});
@@ -159,6 +173,28 @@ public class D3 extends AbstractJavaScriptComponent {
 			}
 			
 		});
+		addFunction("displayInfo", new JavaScriptFunction() {
+			
+			private static final long serialVersionUID = -8172758366004562840L;
+
+			@Override
+			public void call(JsonArray arguments) throws JSONException {
+				for(D3Listener listener : listeners)
+					listener.displayInfo(asInteger(arguments, 0), asInteger(arguments, 1));
+			}
+			
+		});
+		addFunction("displayMeter", new JavaScriptFunction() {
+			
+			private static final long serialVersionUID = -8685767075489512422L;
+
+			@Override
+			public void call(JsonArray arguments) throws JSONException {
+				for(D3Listener listener : listeners)
+					listener.displayMeter(asInteger(arguments, 0), asInteger(arguments, 1));
+			}
+			
+		});
 	}
 	
 	public void addListener(D3Listener listener) {
@@ -170,11 +206,12 @@ public class D3 extends AbstractJavaScriptComponent {
 		return (D3State) super.getState();
 	}
 	
-	public void update(final MapVis model, int width, boolean logged) {
+	public void update(final MapVis model, int width, boolean logged, boolean edit) {
 		getState().setModel(model);
 		if(model != null) {
 			model.width = width-30;
 			getState().setLogged(logged);
+			getState().setEdit(edit);
 		}
 	}
 	

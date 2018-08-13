@@ -113,7 +113,6 @@ div.evenProperty {
         text.header {
             font-size: 14px;
             text-decoration: underline;
-            text-anchor: middle;
         }
 
         text.visio.label {
@@ -164,7 +163,7 @@ div.evenProperty {
         }
 
         text.tavoiteMeter {
-            font-size: 10px;
+            font-size: 8px;
         }
 
         text.tavoite.idElement {
@@ -206,8 +205,8 @@ div.evenProperty {
             cursor: pointer;
         }
 
-        text.parents.link {
-            font-size: 7px;
+        text.parent.link {
+            font-size: 10px;
         }
 
         path.header {
@@ -317,6 +316,14 @@ div.propertyHeader {
     text-align: center;
 }
 
+div.menuHeader {
+    text-align: center;
+    margin-top: 3px;
+    margin-bottom: 3px;
+    margin-left: 3px;
+    margin-right: 3px;
+}
+
 div.v-button.redButton {
     box-shadow:none; 
     color: #000000; 
@@ -337,4 +344,76 @@ div.v-button.redButton {
     opacity: 1.0;
 }
 
+text.fixed {
+  font-size: 50px;
+	font-family: FontAwesome;
+	font-style: normal;
+	font-weight: normal;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	display: inline-block;
+	text-align: center;
+}
+
+text.required {
+  font-size: 50px;
+	font-family: FontAwesome;
+	font-style: normal;
+	font-weight: normal;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	display: inline-block;
+	text-align: center;
+}
+
+text.infoElement {
+  font-size: 12px;
+	font-family: FontAwesome;
+	font-style: normal;
+	font-weight: normal;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	display: inline-block;
+	text-align: center;
+}
+
+text.meterElement {
+  font-size: 12px;
+	font-family: FontAwesome;
+	font-style: normal;
+	font-weight: normal;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	display: inline-block;
+	text-align: center;
+}
+
+.fi_semantum_strategia div.v-label.editMode {
+    background: #e88;
+    padding: 2px;
+    text-align: center;
+}
+
+.fi_semantum_strategia div.v-label.viewMode {
+    background: #9be;
+    padding: 2px;
+    text-align: center;
+}
+
+div.tooltip {
+    font-family: "Verdana", "Chewy", "Indie Flower", "Open Sans", Candara, Optima, Arial, sans-serif;
+    font-size: 14px;
+}
+
+div.v-slot-outerInputTable {
+    margin-top : 2px;
+	margin-left : 10px;
+    margin-right : 10px;
+}
+
+div.v-slot-innerInputTable {
+    margin-top : 2px;
+	margin-left : 30px;
+    margin-right : 10px;
+}
         
